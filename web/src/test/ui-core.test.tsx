@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, LoginPage, notificationText } from '../App'
+import { api, Dashboard, LoginPage, notificationText, WebNotifications } from '../App'
 
 describe('MedLine UI core behavior', () => {
   afterEach(() => cleanup())
@@ -34,5 +34,23 @@ describe('MedLine UI core behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
     expect(screen.getByRole('button', { name: 'Send recovery instructions' })).toBeInTheDocument()
     expect(screen.getByText('Recover your password')).toBeInTheDocument()
+  })
+
+  it('renders the dashboard shell and loads catalog/metric data', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ data: { data: [], metrics: { orders: 12 } } } as never)
+    render(<Dashboard role="admin" />)
+
+    expect(screen.getByText('Medicine search')).toBeInTheDocument()
+    expect(screen.getByText('Recent activity')).toBeInTheDocument()
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/dashboard'))
+  })
+
+  it('refreshes the notification inbox when a live notification event arrives', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ data: { data: [] } } as never)
+    render(<WebNotifications locale="en" />)
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/notifications', expect.anything()))
+    const callsBeforeEvent = get.mock.calls.length
+    window.dispatchEvent(new CustomEvent('medline:notification'))
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(callsBeforeEvent))
   })
 })

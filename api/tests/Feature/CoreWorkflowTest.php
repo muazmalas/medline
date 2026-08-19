@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Support\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CoreWorkflowTest extends TestCase
@@ -62,5 +64,30 @@ class CoreWorkflowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.code', 'annual_pharmacy')
             ->assertJsonPath('data.0.duration_months', 12);
+    }
+
+    public function test_partner_payment_proof_enters_manual_review_without_payment_provider(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create(['role' => 'pharmacy']);
+        $partner = Partner::create([
+            'user_id' => $user->id,
+            'type' => 'pharmacy',
+            'business_name' => 'Proof Test Pharmacy',
+            'approval_status' => 'approved',
+            'subscription_status' => 'active',
+        ]);
+
+        $this->actingAs($user)->postJson('/api/v1/subscription/payment-proof', [
+            'amount' => (float) config('medline.subscription_plans.annual_pharmacy.amount', 100),
+            'plan_code' => 'annual_pharmacy',
+            'proof' => UploadedFile::fake()->create('wallet-proof.pdf', 20, 'application/pdf'),
+        ], ['Idempotency-Key' => 'payment-proof-core-1'])
+            ->assertCreated()
+            ->assertJsonPath('message', 'Payment proof submitted for review.');
+
+        $this->assertDatabaseHas('subscriptions', ['partner_id' => $partner->id, 'status' => 'payment_under_review']);
+        $this->assertDatabaseHas('payment_proofs', ['submitted_by' => $user->id, 'status' => 'under_review']);
+        $this->assertDatabaseHas('partners', ['id' => $partner->id, 'subscription_status' => 'inactive']);
     }
 }

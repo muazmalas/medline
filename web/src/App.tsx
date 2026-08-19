@@ -150,7 +150,7 @@ async function downloadPrivate(path: string, filename: string) {
   const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
 }
 
-function WebNotifications({ locale }: { locale: string }) {
+export function WebNotifications({ locale }: { locale: string }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<NotificationRecord[]>([])
   const busyNotificationIds = useRef(new Set<string>())

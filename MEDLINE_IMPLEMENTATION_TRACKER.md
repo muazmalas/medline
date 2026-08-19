@@ -67,7 +67,7 @@ Every completed task should include a short note in the Implementation Log.
 | React status | Authenticated role-aware dashboards, localized metric cards, live operational refreshes, catalog, partner management, prescription review, procurement, privacy-scoped delivery monitoring with validated OpenStreetMap embedding, support, notifications, and settings implemented |
 | Flutter status | Role-gated shell, sign-in/session flow, patient ordering, partner queues, live dashboard metrics, driver delivery lifecycle, scoped encrypted offline mutation replay, Android flavors, and web host implemented |
 | Database status | Initial production-shaped schema migrated and seeded |
-| Testing status | Laravel 20 tests/50 assertions and React 3 UI tests pass; React coverage is 5.68% statements, while Laravel percentage coverage awaits Xdebug/PCOV; interactive browser/device acceptance remains an owner check |
+| Testing status | Laravel 23 tests/64 assertions and React 5 UI tests pass; React coverage is 10.29% statements and 17.39% lines, while Laravel percentage coverage awaits Xdebug/PCOV; Flutter widget tests are authored but SDK execution remains blocked; interactive browser/device acceptance remains an owner check |
 | Deployment status | Native Windows and Flutter mobile release handoff documentation created; IIS CSP now explicitly permits only the OpenStreetMap embed origin; signing/provider secrets remain deployment-owner configuration |
 | Last updated | 2026-08-19 |
 
@@ -1557,6 +1557,7 @@ Security/dependency scans
 - [x] Initialized the single root Git repository with `muazmalas@gmail.com` and remote `git@github.com:muazmalas/medline.git`; local `.env` files and toolchain artifacts remain ignored.
 - [x] Added Vitest/jsdom/Testing Library UI coverage for notification privacy filtering, login submission/token storage, and password-recovery navigation; added Laravel core workflow coverage for notification access, preferences, plans, and private-channel dispatch.
 - [x] Validation result: Laravel `php artisan test` passed 20 tests/50 assertions; API Vite build and React `npm run build` passed; React `npm run test:coverage` reported 5.68% statements, 2.27% branches, 2.79% functions, and 10.67% lines.
+- [x] Expanded critical-workflow coverage: prescription-required order gating, approved-driver claim/status transitions, manual subscription proof review, dashboard rendering, and live notification refresh. Latest result: Laravel 23 tests/64 assertions and React 5 tests passed; React coverage is 10.29% statements, 5.45% branches, 7.12% functions, and 17.39% lines. Flutter widget tests are committed but not executable until the local SDK finishes initialization.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
