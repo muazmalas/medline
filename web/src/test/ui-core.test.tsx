@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../echo', () => ({ createMedlineEcho: () => ({ private: () => ({ listen: () => undefined }), disconnect: () => undefined }) }))
-import RootApp, { AdminSettingsPage, AdminTwoFactorPanel, api, ComplaintDetailPanel, ConsentSettings, Dashboard, DashboardAlerts, DeliveryDetailPanel, LiveDashboard, LoginPage, NotificationHealthPanel, notificationText, OperationsPage, OrderDetailPanel, PartnerAccessGuard, PartnerManagementPanel, PrescriptionReviewPanel, ProcurementCreatePanel, ProcurementDetailPanel, RatingQueue, SettingsPage, UserRolePanel, WebNotifications } from '../App'
+import RootApp, { AdminSettingsPage, AdminTwoFactorPanel, api, ComplaintDetailPanel, ConsentSettings, Dashboard, DashboardAlerts, DeliveryDetailPanel, LiveDashboard, LoginPage, NotificationHealthPanel, notificationText, OperationsPage, OrderDetailPanel, PartnerAccessGuard, PartnerManagementPanel, PrescriptionReviewPanel, ProcurementCreatePanel, ProcurementDetailPanel, RatingQueue, SettingsPage, UserRolePanelWithCompany, WebNotifications } from '../App'
 import { captureWebError } from '../telemetry'
 
 describe('MedLine UI core behavior', () => {
@@ -199,7 +199,7 @@ describe('MedLine UI core behavior', () => {
   it('covers partner, user, procurement, and prescription administration workflows', async () => {
     const get = vi.spyOn(api, 'get').mockImplementation(async (url) => {
       if (url === '/admin/partners') return { data: { data: [{ id: 11, business_name: 'Demo Pharmacy', type: 'pharmacy', approval_status: 'pending' }] } } as never
-      if (url === '/admin/users') return { data: { data: [{ id: 12, name: 'Demo User', role: 'patient', email: 'demo@example.test' }] } } as never
+      if (url === '/admin/users') return { data: { data: [{ id: 12, name: 'Demo User', role: 'pharmacy', email: 'demo@example.test', company_name: 'Demo Pharmacy Group' }, { id: 16, name: 'Demo Driver', role: 'driver', email: 'driver@example.test' }, { id: 17, name: 'Demo Support', role: 'support', email: 'support@example.test' }, { id: 18, name: 'Demo Patient', role: 'patient', email: 'patient@example.test' }] } } as never
       if (url === '/partners') return { data: { data: [{ id: 13, business_name: 'Demo Warehouse' }] } } as never
       if (url === '/medicines') return { data: { data: [{ id: 14, name_en: 'Paracetamol', manufacturer: 'MedLine' }] } } as never
       if (url === '/pharmacy/prescriptions') return { data: { data: [{ id: 15, order_public_id: 'ORD-RX-15', status: 'pending_review' }] } } as never
@@ -214,10 +214,11 @@ describe('MedLine UI core behavior', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/partners/11/decision', expect.objectContaining({ decision: 'correction' }), expect.anything()))
     cleanup()
 
-    render(<UserRolePanel section="users" />)
+    render(<UserRolePanelWithCompany section="users" />)
     await waitFor(() => expect(screen.getByText('Demo User')).toBeInTheDocument())
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'driver' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save role' }))
+    expect(screen.getByText('Demo Pharmacy Group')).toBeInTheDocument()
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'driver' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save role' })[0])
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/admin/users/12/role', expect.objectContaining({ role: 'driver' }), expect.anything()))
     cleanup()
 
