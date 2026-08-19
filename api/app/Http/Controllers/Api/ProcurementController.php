@@ -30,6 +30,14 @@ class ProcurementController extends Controller
     {
         $partner = Partner::where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('subscription_status', 'active')->firstOrFail();
         $query = DB::table('procurement_orders')->where(function ($q) use ($partner) { $q->where('pharmacy_id', $partner->id)->orWhere('warehouse_id', $partner->id); });
+        if ($request->string('search')->isNotEmpty()) {
+            $like = '%' . $request->string('search')->toString() . '%';
+            $query->where(function ($nested) use ($like) {
+                $nested->where('public_id', 'like', $like)
+                    ->orWhere('status', 'like', $like)
+                    ->orWhere('delivery_address_snapshot', 'like', $like);
+            });
+        }
         return response()->json($query->latest()->paginate(20));
     }
 

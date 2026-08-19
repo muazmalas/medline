@@ -111,6 +111,15 @@ class AdminController extends Controller
         $partners = Partner::query()
             ->when($request->string('type')->isNotEmpty(), fn ($query) => $query->where('type', $request->string('type')->toString()))
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('approval_status', $request->string('status')->toString()))
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
+                $like = '%' . $request->string('search')->toString() . '%';
+                $query->where(function ($nested) use ($like) {
+                    $nested->where('business_name', 'like', $like)
+                        ->orWhere('license_number', 'like', $like)
+                        ->orWhere('type', 'like', $like)
+                        ->orWhere('approval_status', 'like', $like);
+                });
+            })
             ->latest()
             ->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($partners);

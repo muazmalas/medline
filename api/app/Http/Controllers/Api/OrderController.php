@@ -24,6 +24,14 @@ class OrderController extends Controller
         $orders = Order::query()
             ->with('items')
             ->when($request->user()->role === 'patient', fn ($query) => $query->where('patient_id', $request->user()->id))
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
+                $like = '%' . $request->string('search')->toString() . '%';
+                $query->where(function ($nested) use ($like) {
+                    $nested->where('public_id', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhere('delivery_address_snapshot', 'like', $like);
+                });
+            })
             ->latest()
             ->paginate(min($request->integer('per_page', 15), 50));
 
@@ -36,6 +44,9 @@ class OrderController extends Controller
         $order->load('items');
         $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
+            $delivery->driver = $delivery->driver_id
+                ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $delivery->driver_id)->select('users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
+                : null;
             if ($request->user()->role === 'patient' && $delivery->status !== 'delivered' && ! $delivery->pin_used_at && $delivery->pin_encrypted) $delivery->delivery_pin = Crypt::decryptString($delivery->pin_encrypted);
             $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
             if (! in_array($delivery->status, ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'], true) || ! $delivery->location_updated_at || strtotime((string) $delivery->location_updated_at) < $locationFreshAfter->timestamp) {

@@ -135,13 +135,15 @@ describe('MedLine UI core behavior', () => {
 
   it('renders the protected order, delivery, complaint, and procurement detail views', () => {
     const { container } = render(<>
-      <OrderDetailPanel detail={{ order: { public_id: 'ORD-DETAIL', status: 'accepted', total: 120 }, invoice: { subtotal: 100, delivery_fee: 20, total: 120 }, timeline: [{ id: 1, to_status: 'accepted' }] }} onClose={vi.fn()} locale="en" />
+      <OrderDetailPanel detail={{ order: { public_id: 'ORD-DETAIL', status: 'accepted', total: 120 }, delivery: { status: 'in_transit', driver: { name: 'Demo Driver', email: 'driver@medline.local', vehicle_type: 'Motorcycle', vehicle_plate: 'ML-2026', is_available: true } }, invoice: { subtotal: 100, delivery_fee: 20, total: 120 }, timeline: [{ id: 1, to_status: 'accepted', created_at: '2026-08-19T12:00:00Z' }] }} onClose={vi.fn()} locale="en" />
       <DeliveryDetailPanel detail={{ delivery: { id: 4, public_id: 'DEL-DETAIL', status: 'in_transit', order_public_id: 'ORD-DETAIL', delivery_address_snapshot: 'Damascus', total: 120, last_latitude: 33.5, last_longitude: 36.3 }, events: [] }} onClose={vi.fn()} locale="en" />
       <ComplaintDetailPanel detail={{ complaint: { id: 5, subject: 'Missing medicine', status: 'open', category: 'delivery', description: 'A medicine was missing.' }, attachments: [] }} onClose={vi.fn()} locale="en" />
       <ProcurementDetailPanel detail={{ procurement: { public_id: 'PROC-DETAIL', status: 'accepted', total: 400, delivery_address_snapshot: 'Damascus' }, items: [{ id: 1, name_en: 'Paracetamol', quantity: 2, accepted_quantity: 2, line_total: 400 }], delivery: { status: 'available' }, timeline: [] }} onClose={vi.fn()} locale="en" />
     </>)
 
     expect(container.textContent).toContain('ORD-DETAIL')
+    expect(container.textContent).toContain('Demo Driver')
+    expect(container.textContent).toContain('Delivery progress')
     expect(container.textContent).toContain('DEL-DETAIL')
     expect(container.textContent).toContain('Missing medicine')
     expect(container.textContent).toContain('PROC-DETAIL')
@@ -212,6 +214,8 @@ describe('MedLine UI core behavior', () => {
 
     render(<PartnerManagementPanel section="pharmacies" />)
     await waitFor(() => expect(screen.getByText('Demo Pharmacy')).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText('Search pharmacies'), { target: { value: 'Central' } })
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/partners', { params: { type: 'pharmacy', search: 'Central', per_page: 100 } }))
     fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
     await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/partners/11/decision', expect.objectContaining({ decision: 'correction' }), expect.anything()))
     cleanup()

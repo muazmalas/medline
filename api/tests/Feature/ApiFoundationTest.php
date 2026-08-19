@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Medicine;
+use App\Models\Order;
 use App\Models\Partner;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +50,56 @@ class ApiFoundationTest extends TestCase
         $this->getJson('/api/v1/medicines?search=Para')
             ->assertOk()
             ->assertJsonPath('data.0.name_en', 'Paracetamol');
+    }
+
+    public function test_order_search_matches_public_id_status_and_address(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $patient = User::factory()->create(['role' => 'patient']);
+        $pharmacy = Partner::create([
+            'user_id' => User::factory()->create(['role' => 'pharmacy'])->id,
+            'type' => 'pharmacy',
+            'business_name' => 'Search Pharmacy',
+            'approval_status' => 'approved',
+            'subscription_status' => 'active',
+        ]);
+        Order::create([
+            'public_id' => 'SEARCH-ORDER-001', 'patient_id' => $patient->id, 'pharmacy_id' => $pharmacy->id,
+            'status' => 'pending_pharmacy_review', 'payment_method' => 'cash_on_delivery', 'payment_status' => 'pending',
+            'subtotal' => 100, 'delivery_fee' => 0, 'total' => 100, 'delivery_address_snapshot' => 'Central Damascus',
+        ]);
+        Order::create([
+            'public_id' => 'OTHER-ORDER-001', 'patient_id' => $patient->id, 'pharmacy_id' => $pharmacy->id,
+            'status' => 'completed', 'payment_method' => 'cash_on_delivery', 'payment_status' => 'paid',
+            'subtotal' => 200, 'delivery_fee' => 0, 'total' => 200, 'delivery_address_snapshot' => 'Other address',
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/v1/orders?search=SEARCH-ORDER')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.public_id', 'SEARCH-ORDER-001');
+    }
+
+    public function test_administrator_partner_search_matches_name_license_and_status(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Partner::create([
+            'user_id' => User::factory()->create(['role' => 'pharmacy'])->id,
+            'type' => 'pharmacy', 'business_name' => 'Central Search Pharmacy', 'license_number' => 'PH-SEARCH-001',
+            'approval_status' => 'approved', 'subscription_status' => 'active',
+        ]);
+        Partner::create([
+            'user_id' => User::factory()->create(['role' => 'pharmacy'])->id,
+            'type' => 'pharmacy', 'business_name' => 'Other Pharmacy', 'license_number' => 'PH-OTHER-001',
+            'approval_status' => 'pending', 'subscription_status' => 'inactive',
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/v1/admin/partners?type=pharmacy&search=Central')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.business_name', 'Central Search Pharmacy');
     }
 
     public function test_authenticated_user_can_view_current_user(): void

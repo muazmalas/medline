@@ -26,6 +26,14 @@ class OrderWorkflowController extends Controller
 
         $orders = Order::with('items')
             ->where('pharmacy_id', $partner->id)
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
+                $like = '%' . $request->string('search')->toString() . '%';
+                $query->where(function ($nested) use ($like) {
+                    $nested->where('public_id', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhere('delivery_address_snapshot', 'like', $like);
+                });
+            })
             ->latest()
             ->paginate(min($request->integer('per_page', 20), 50));
 
