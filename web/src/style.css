@@ -287,6 +287,7 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .registration-grid label { display: grid; gap: 7px; color: #587484; font-size: 12px; font-weight: 800; }
 .registration-grid input { width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid #d5e5eb; border-radius: 9px; padding: 11px 12px; outline: none; color: #17384e; background: #fbfdfe; font-size: 13px; }
 .registration-grid input:focus { border-color: #52b8d8; box-shadow: 0 0 0 3px #e2f5fb; background: #fff; }
+.registration-grid input.registration-invalid { border-color: #d85c67; background: #fff5f5; box-shadow: 0 0 0 3px #fde4e6; }
 .registration-span-2 { grid-column: span 2; }
 .registration-map-wrap { overflow: hidden; border: 1px solid #d4e5eb; border-radius: 14px; background: #eef7fa; }
 .registration-map { height: 300px; width: 100%; }
