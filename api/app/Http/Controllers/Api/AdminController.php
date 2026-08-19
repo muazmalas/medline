@@ -147,6 +147,20 @@ class AdminController extends Controller
         return response()->json(['driver' => $profile, 'summary' => ['total' => $trips->count(), 'accepted' => (int) ($counts['accepted'] ?? 0), 'in_progress' => (int) $counts->only(['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'])->sum(), 'completed' => (int) ($counts['delivered'] ?? 0), 'cancelled' => (int) ($counts['cancelled'] ?? 0), 'failed' => (int) ($counts['failed'] ?? 0)], 'trips' => $trips]);
     }
 
+    public function procurements(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->role === 'admin', 403);
+        $rows = DB::table('procurement_orders')->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')->select('procurement_orders.*', 'pharmacies.business_name as pharmacy_name', 'warehouses.business_name as warehouse_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('procurement_orders.public_id', 'like', $like)->orWhere('pharmacies.business_name', 'like', $like)->orWhere('warehouses.business_name', 'like', $like)->orWhere('procurement_orders.status', 'like', $like)); })->latest('procurement_orders.created_at')->paginate(min($request->integer('per_page', 30), 100));
+        return response()->json($rows);
+    }
+
+    public function inventory(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->role === 'admin', 403);
+        $rows = DB::table('inventories')->join('medicines', 'medicines.id', '=', 'inventories.medicine_id')->join('partners', function ($join) { $join->on('partners.id', '=', 'inventories.owner_id')->whereColumn('partners.type', 'inventories.owner_type'); })->select('inventories.*', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.prescription_required', 'partners.business_name as owner_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('medicines.name_en', 'like', $like)->orWhere('medicines.manufacturer', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })->orderBy('medicines.name_en')->paginate(min($request->integer('per_page', 50), 100));
+        return response()->json($rows);
+    }
+
     public function deliveries(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);

@@ -124,6 +124,8 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::get('/admin/partners', [AdminController::class, 'partners']);
         Route::get('/admin/partners/{partner}', [AdminController::class, 'partner']);
         Route::get('/admin/drivers/{driver}', [AdminController::class, 'driver']);
+        Route::get('/admin/procurements', [AdminController::class, 'procurements']);
+        Route::get('/admin/inventory', [AdminController::class, 'inventory']);
         Route::get('/admin/deliveries', [AdminController::class, 'deliveries']);
         Route::get('/admin/subscriptions', [AdminController::class, 'subscriptions']);
         Route::get('/admin/complaints', [AdminController::class, 'complaints']);

@@ -73,6 +73,8 @@ class DemoScenarioSeeder extends Seeder
 
         $procurementId = $this->procurement($pharmacyId, $warehouseId, $ibuprofenId);
         $this->procurementItem($procurementId, $ibuprofenId);
+        $this->additionalProcurement($pharmacyId, $warehouseId, $paracetamolId, 'DEMO-PROC-ACCEPTED-01', 'accepted', 24, 420);
+        $this->additionalProcurement($pharmacyId, $warehouseId, $antibioticId, 'DEMO-PROC-COMPLETED-01', 'completed', 12, 1500);
         $this->complaint($patient->id, $orders['completed'], $support->id);
         $this->seedNotifications($patient->id, $pharmacyUser->id, $driver->id, $orders['transit'], $completedDeliveryId);
         $this->seedDeliveryAttempt($patient->id);
@@ -156,6 +158,14 @@ class DemoScenarioSeeder extends Seeder
     private function procurementItem(int $procurementId, int $medicineId): void
     {
         DB::table('procurement_order_items')->updateOrInsert(['procurement_order_id' => $procurementId, 'medicine_id' => $medicineId], ['quantity' => 10, 'accepted_quantity' => 0, 'unit_price' => 600, 'line_total' => 6000, 'updated_at' => now(), 'created_at' => now()]);
+    }
+
+    private function additionalProcurement(int $pharmacyId, int $warehouseId, int $medicineId, string $publicId, string $status, int $quantity, int $unitPrice): void
+    {
+        $orderTotal = $quantity * $unitPrice;
+        DB::table('procurement_orders')->updateOrInsert(['public_id' => $publicId], ['pharmacy_id' => $pharmacyId, 'warehouse_id' => $warehouseId, 'status' => $status, 'subtotal' => $orderTotal, 'delivery_fee' => 2500, 'total' => $orderTotal + 2500, 'delivery_address_snapshot' => 'Demo Central Pharmacy, Damascus', 'pharmacy_note' => 'Committee demo procurement scenario', 'updated_at' => now(), 'created_at' => now()]);
+        $id = (int) DB::table('procurement_orders')->where('public_id', $publicId)->value('id');
+        DB::table('procurement_order_items')->updateOrInsert(['procurement_order_id' => $id, 'medicine_id' => $medicineId], ['quantity' => $quantity, 'accepted_quantity' => $status === 'pending_warehouse_review' ? 0 : $quantity, 'unit_price' => $unitPrice, 'line_total' => $orderTotal, 'updated_at' => now(), 'created_at' => now()]);
     }
 
     private function subscription(int $partnerId, int $submittedBy, int $reviewedBy): void
