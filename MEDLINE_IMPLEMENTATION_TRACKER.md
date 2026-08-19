@@ -1849,3 +1849,225 @@ Production configuration, backup, scheduler, health-check, release-manifest, And
 - Android cannot reach API: use `10.0.2.2` for emulator or the PC LAN IP for a physical device, not `127.0.0.1`.
 - Seed data is inconsistent: confirm the correct database in `.env`, then run `php artisan db:seed --class=DemoScenarioSeeder`; use `migrate:fresh --seed` only for disposable local data.
 - Never fix a production issue by deleting tables, resetting the database, or exposing private files. Follow `docs/OPERATIONS_RECOVERY_RUNBOOK.md`.
+
+## End-to-end solution plan and system explanation
+
+### System purpose
+
+MedLine is a medication ordering and healthcare logistics platform. A patient selects medicines, submits an order, attaches a prescription when required, and chooses a delivery address. A pharmacy reviews and prepares the order. A driver claims and delivers it. Warehouses replenish pharmacy stock through procurement requests. Administrators supervise users, partners, catalog records, verification, subscriptions, notifications, complaints, ratings, audit events, and operational reporting.
+
+The system is intentionally separated into three clients and one API boundary:
+
+```mermaid
+flowchart LR
+    Patient[Patient] --> Mobile[Flutter Android app]
+    Pharmacy[Pharmacy staff] --> Portal[React operations portal]
+    Warehouse[Warehouse staff] --> Portal
+    Driver[Driver] --> Mobile
+    Admin[Administrator] --> Portal
+    Mobile --> API[Laravel REST API]
+    Portal --> API
+    API --> MySQL[(MySQL 8 database)]
+    API --> PrivateFiles[(Private prescription/payment storage)]
+    API --> Queue[(Database queue)]
+    Queue --> Mail[Email log/local mail provider]
+    API --> Reverb[Optional Laravel Reverb]
+    Reverb --> Portal
+    Reverb --> Mobile
+    API --> OSM[OpenStreetMap map tiles/directions]
+```
+
+### Architecture responsibilities
+
+| Layer | Responsibility | Source |
+|---|---|---|
+| Flutter | Patient ordering, prescription upload, driver delivery workflow, availability, foreground location, partner mobile actions | `mobile/` |
+| React/Vite | Admin, pharmacy, warehouse, and operational portal workflows; searchable and paginated tables; maps and detail views | `web/` |
+| Laravel | Authentication, authorization, validation, transactions, idempotency, notification dispatch, APIs, file access, audit logging | `api/app/`, `api/routes/` |
+| MySQL | Users, roles, partners, medicines, inventory, orders, prescriptions, deliveries, procurement, notifications, audit records | `api/database/migrations/` |
+| Queue | Deferred notification/email processing and operational background work without Redis | `QUEUE_CONNECTION=database` |
+| Reverb | Optional localhost realtime notification echo; polling remains the fallback | `BROADCAST_CONNECTION=reverb` |
+| OpenStreetMap | Pickup, drop-off, partner locations, route display, and directions | React map components |
+
+### Roles and access model
+
+```mermaid
+flowchart TD
+    User[Authenticated user] --> Role{Role}
+    Role --> Patient[Patient]
+    Role --> Pharmacy[Pharmacy]
+    Role --> Warehouse[Warehouse]
+    Role --> Driver[Driver]
+    Role --> Admin[Administrator]
+    Patient --> PatientActions[Create orders, upload prescriptions, track delivery, rate service]
+    Pharmacy --> PharmacyActions[Review orders, manage inventory, request warehouse stock]
+    Warehouse --> WarehouseActions[Review procurement, manage stock, approve/reject requests]
+    Driver --> DriverActions[Availability, claim delivery, update statuses, foreground location]
+    Admin --> AdminActions[Users, partners, catalog, verification, audit, complaints, ratings, reporting]
+    Role --> Policy[Laravel policies and role-scoped query authorization]
+    Policy --> API[Every API mutation and detail endpoint]
+```
+
+### Core order lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending_pharmacy_review: Patient submits order
+    pending_pharmacy_review --> prescription_review: Prescription required
+    pending_pharmacy_review --> accepted: Pharmacy accepts
+    prescription_review --> accepted: Pharmacist approves prescription
+    prescription_review --> cancelled: Prescription rejected
+    pending_pharmacy_review --> cancelled: Pharmacy rejects
+    accepted --> claimed: Driver claims delivery
+    claimed --> pickup_started: Driver starts pickup
+    pickup_started --> picked_up: Pharmacy hands over medicines
+    picked_up --> in_transit: Driver leaves pickup
+    in_transit --> arrived: Driver reaches destination
+    arrived --> delivered: PIN/confirmation completed
+    accepted --> cancelled: Cancellation before dispatch
+    claimed --> cancelled: Operational cancellation
+    delivered --> [*]
+    cancelled --> [*]
+```
+
+Order and delivery states must remain compatible. Orders in pharmacy or prescription review do not have active deliveries. Accepted orders may have a claimed or active delivery. Completed orders use a delivered delivery. Cancelled orders use a cancelled delivery or no delivery when cancellation occurred before dispatch. The idempotent demo seeder enforces these scenarios.
+
+### Order and delivery sequence
+
+```mermaid
+sequenceDiagram
+    actor Patient
+    participant Client as Flutter/React client
+    participant API as Laravel API
+    participant DB as MySQL
+    participant Pharmacy
+    participant Driver
+    participant Notify as Notification service
+
+    Patient->>Client: Select medicines and address
+    Client->>API: POST /orders with idempotency key
+    API->>DB: Validate, reserve workflow, create order
+    API->>Notify: Dispatch order.created after commit
+    API-->>Client: Order and status
+    Pharmacy->>API: Review/accept order
+    API->>DB: Update order in transaction
+    Driver->>API: Claim eligible delivery
+    API->>DB: Assign driver and create timeline event
+    Driver->>API: Pickup, transit, arrival, delivery updates
+    API->>DB: Save status, event, and fresh location
+    API->>Notify: Dispatch status/location notification
+    Client->>API: Poll or receive optional realtime update
+    API-->>Client: Timeline, route, driver, and invoice details
+```
+
+### Procurement and inventory flow
+
+```mermaid
+flowchart LR
+    Pharmacy -->|Select warehouse, medicine, quantity| Request[Procurement request]
+    Request --> Validate{Approved partner and active subscription?}
+    Validate -->|No| Reject[Reject with stable API error]
+    Validate -->|Yes| Lock[Transaction and row lock]
+    Lock --> Stock{Enough available stock?}
+    Stock -->|No| RejectStock[Reject: stock unavailable]
+    Stock -->|Yes| Reserve[Increase reserved quantity]
+    Reserve --> Warehouse[Warehouse review]
+    Warehouse -->|Reject| Release[Release reservation]
+    Warehouse -->|Accept| Fulfill[Prepare and dispatch stock]
+    Fulfill --> Receive[Pharmacy receives stock]
+    Receive --> Inventory[Update quantity and reserved quantity]
+    Inventory --> Audit[Audit and notification events]
+```
+
+Inventory changes, order decisions, delivery transitions, procurement decisions, and other critical writes use database transactions, row locks where stock is involved, idempotency keys where supported, authorization, audit events, and post-commit notification dispatch.
+
+### Notification channels and lifecycle
+
+```mermaid
+flowchart TD
+    Event[Committed domain event] --> Service[NotificationService]
+    Service --> Inbox[In-app notification inbox]
+    Service --> Email[Email channel]
+    Service --> Push[Optional mobile push channel]
+    Inbox --> Bell[Portal bell popover]
+    Inbox --> Table[Notifications workspace]
+    Bell --> Read[Mark read]
+    Table --> Read
+    Table --> Delete[Delete notification]
+    Service --> Attempt[Delivery attempt record]
+    Attempt --> Retry[Bounded retry/queue policy]
+    Retry --> Failure[Structured failure log and operational review]
+```
+
+For localhost, the inbox is always available, email is written to `api/storage/logs/laravel.log`, Reverb is optional, and Redis is not required. Notification records are user-scoped and cannot be read, changed, or deleted by another user.
+
+### Data model overview
+
+```mermaid
+erDiagram
+    USERS ||--o| PARTNERS : owns
+    USERS ||--o| DRIVERS : operates
+    USERS ||--o{ ORDERS : creates
+    PARTNERS ||--o{ ORDERS : fulfills
+    PARTNERS ||--o{ INVENTORIES : owns
+    MEDICINES ||--o{ INVENTORIES : stocked_as
+    MEDICINES ||--o{ ORDER_ITEMS : ordered_as
+    ORDERS ||--|{ ORDER_ITEMS : contains
+    ORDERS ||--o| PRESCRIPTIONS : requires
+    ORDERS ||--o| DELIVERIES : dispatches
+    DRIVERS ||--o{ DELIVERIES : assigned
+    DELIVERIES ||--o{ DELIVERY_EVENTS : records
+    PARTNERS ||--o{ PROCUREMENT_ORDERS : pharmacy_or_warehouse
+    PROCUREMENT_ORDERS ||--|{ PROCUREMENT_ITEMS : contains
+    MEDICINES ||--o{ PROCUREMENT_ITEMS : requested
+    USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ AUDIT_LOGS : performs
+```
+
+### Operational UI standards
+
+All operational tables should provide a consistent search input, useful quick-view columns, readable currency and timestamp formatting, alternating row backgrounds, hover/focus highlighting, row click navigation, an explicit Action column, pagination, horizontal scrolling when the column set is wide, and accessible icon labels/tooltips. Orders additionally provide status filtering and sortable headers. Detail screens use cards for invoice, partner/driver, route, timeline, and operational metadata. OpenStreetMap is used for real maps; the UI must not substitute decorative route art for operational location data.
+
+### Security and data rules
+
+- Laravel is authoritative for role checks, partner approval, subscription eligibility, prescription privacy, and critical mutations.
+- Private prescription and payment-proof files are never exposed through public URLs.
+- Tokens are stored in secure mobile storage; browser sessions use protected cookie settings in production.
+- Do not log passwords, access tokens, prescription content, payment proofs, or precise location history unnecessarily.
+- Driver location is foreground-only for active deliveries and is hidden when stale or terminal.
+- Payment provider activation is intentionally deferred for the localhost demo; payment proof review remains available as a controlled workflow.
+- Local `.env` files are committed only because this repository is being used as a localhost installation package. Replace all keys and credentials before deployment.
+
+### Deployment lifecycle chart
+
+```mermaid
+flowchart TD
+    Source[Checkout repository] --> Config[Create protected production .env files]
+    Config --> DB[Provision MySQL and restricted user]
+    DB --> Dependencies[composer install --no-dev and npm ci]
+    Dependencies --> Migrate[php artisan migrate --force]
+    Migrate --> Cache[Cache config/routes/views]
+    Cache --> Workers[Start queue worker and scheduler]
+    Workers --> WebBuild[npm run build]
+    WebBuild --> IIS[Publish web/dist with React route fallback]
+    IIS --> Health[Check liveness/readiness endpoints]
+    Health --> Backup[Verify encrypted backup and restore plan]
+    Backup --> Release[Record manifest and approve release]
+```
+
+### Phase roadmap
+
+| Phase | Outcome | Main deliverables |
+|---|---|---|
+| 1. Foundation | Stable local platform | Repository, environment, MySQL, Laravel, React, Flutter, authentication |
+| 2. Identity and partners | Controlled access | Roles, partner profiles, approval, company assignment, documents |
+| 3. Catalog and stock | Reliable medicine supply | Medicine catalog, categories, inventory, reservations, low-stock indicators |
+| 4. Patient ordering | Safe order intake | Search, cart/order creation, prescription upload, address and invoice |
+| 5. Pharmacy operations | Clinical/fulfillment review | Prescription review, order acceptance/rejection, stock preparation |
+| 6. Procurement | Pharmacy replenishment | Warehouse selection, quantity validation, reservation, approval, delivery |
+| 7. Delivery | Traceable logistics | Driver assignment, lifecycle states, route map, timeline, location updates |
+| 8. Notifications | User awareness | In-app inbox, email/log channel, optional Reverb/push, read/delete controls |
+| 9. Governance | Operational confidence | Audit, complaints, ratings, subscriptions, policies, reporting |
+| 10. Validation and release | Controlled promotion | Tests, coverage, security review, backups, health checks, Android release |
+
+This roadmap is the high-level plan; the checked tracker items below it are the implementation evidence and the unchecked items are deliberately deferred scope.
