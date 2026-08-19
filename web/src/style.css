@@ -272,6 +272,9 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .registration-benefits span { color: #75909f; font-size: 12px; line-height: 1.5; }
 .registration-card { padding: 32px; border: 1px solid #dbe9ef; border-radius: 20px; background: #fff; box-shadow: 0 16px 40px #17384e14; }
 .registration-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 18px; margin-bottom: 25px; }
+.registration-card-heading .text-button { width: auto; display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 9px 14px; border: 1px solid #cfe3eb; border-radius: 999px; background: #fff; box-shadow: 0 5px 14px #17384e12; white-space: nowrap; }
+.registration-card-heading .text-button::before { content: '←'; font-size: 16px; line-height: 1; }
+.registration-card-heading .text-button:hover { background: #eef9fd; text-decoration: none; }
 .registration-card-heading h2 { margin: 0; color: #123a54; font: 800 24px Manrope; }
 .registration-role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
 .registration-role { min-height: 95px; display: grid; align-content: center; gap: 7px; padding: 14px; text-align: left; border: 1px solid #d8e7ed; border-radius: 13px; background: #fbfdfe; color: #527184; cursor: pointer; transition: .18s ease; }
