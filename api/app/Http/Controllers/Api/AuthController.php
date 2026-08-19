@@ -30,6 +30,13 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::in(['patient', 'pharmacy', 'warehouse', 'driver'])],
             'business_name' => ['required_if:role,pharmacy,warehouse', 'nullable', 'string', 'max:180'],
+            'license_number' => ['required_if:role,pharmacy,warehouse', 'nullable', 'string', 'max:120', 'unique:partners,license_number'],
+            'address' => ['required_if:role,pharmacy,warehouse', 'nullable', 'string', 'max:1000'],
+            'latitude' => ['required_if:role,pharmacy,warehouse', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['required_if:role,pharmacy,warehouse', 'nullable', 'numeric', 'between:-180,180'],
+            'national_id' => ['required_if:role,driver', 'nullable', 'string', 'max:120', 'unique:drivers,national_id'],
+            'vehicle_type' => ['required_if:role,driver', 'nullable', 'string', 'max:64'],
+            'vehicle_plate' => ['required_if:role,driver', 'nullable', 'string', 'max:32'],
             'transport' => ['sometimes', 'in:bearer,cookie'],
         ]);
 
@@ -50,10 +57,14 @@ class AuthController extends Controller
                     'type' => $created->role,
                     'business_name' => $data['business_name'],
                     'phone' => $created->phone,
+                    'license_number' => $data['license_number'] ?? null,
+                    'address' => $data['address'] ?? null,
+                    'latitude' => $data['latitude'] ?? null,
+                    'longitude' => $data['longitude'] ?? null,
                 ]);
             }
             if ($created->role === 'driver') {
-                DB::table('drivers')->insert(['user_id' => $created->id, 'approval_status' => 'pending', 'is_available' => false, 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('drivers')->insert(['user_id' => $created->id, 'national_id' => $data['national_id'] ?? null, 'vehicle_type' => $data['vehicle_type'] ?? null, 'vehicle_plate' => $data['vehicle_plate'] ?? null, 'approval_status' => 'pending', 'is_available' => false, 'created_at' => now(), 'updated_at' => now()]);
             }
             return $created;
         });

@@ -2071,3 +2071,17 @@ flowchart TD
 | 10. Validation and release | Controlled promotion | Tests, coverage, security review, backups, health checks, Android release |
 
 This roadmap is the high-level plan; the checked tracker items below it are the implementation evidence and the unchecked items are deliberately deferred scope.
+
+### Registration implementation status
+
+- [x] Public `/register` entry point from the unauthenticated sign-in screen.
+- [x] Role selection for Customer/patient, Pharmacy, Warehouse, and Driver.
+- [x] Shared account fields: name, email, phone, password, and confirmation.
+- [x] Pharmacy and warehouse fields: business name, license number, registered address, latitude, and longitude.
+- [x] Driver fields: national ID, vehicle type, and vehicle plate.
+- [x] OpenStreetMap/Leaflet click-to-pin location picker with editable coordinates.
+- [x] Laravel validation and transactional creation of users, partner profiles, or driver profiles.
+- [x] New pharmacy, warehouse, and driver registrations remain pending for administrator review.
+- [x] Local registration uses the existing committed localhost environment and does not require a separate map API key.
+
+The location picker uses OpenStreetMap tiles and stores the selected coordinates in the partner profile. The address remains a human-readable registered address entered by the applicant; coordinates are used for maps, pickup planning, and operational verification. Production deployments must follow OpenStreetMap tile usage policy and use an approved tile provider or self-hosted service if traffic requires it.
