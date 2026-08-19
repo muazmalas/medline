@@ -1562,6 +1562,7 @@ Security/dependency scans
 - [x] Expanded React workflow coverage to 19 passing UI tests covering administrator 2FA lifecycle, notification read behavior, partner/user/procurement/prescription operations, subscription/consent failure handling, authentication recovery, and telemetry safety. Latest React coverage: 50.26% statements, 37.23% branches, 46.68% functions, and 68.72% lines. React production build and Laravel 24-test/73-assertion suite also pass.
 - [x] Fixed duplicate administrator partner/user workspace rendering by placing management panels inside the section router; React validation remains green with 19 tests and 50.11% statement coverage, and the production build passes.
 - [x] Split administrator partner management into separate Pharmacies and Warehouses navigation/table views, added backend partner-type filtering, and added company/organization information to role assignments. React validation: 19 tests pass, 49.17% statements and 67.64% lines; targeted Laravel authorization and full 24-test suite pass.
+- [x] Added searchable role assignments with server-side user search across name, email, company, and role; shared operational and rating tables retain their existing search controls. React validation: 19 tests pass, 49.24% statements and 67.70% lines; Laravel validation: 24 tests and 73 assertions pass.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.

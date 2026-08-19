@@ -217,6 +217,8 @@ describe('MedLine UI core behavior', () => {
     render(<UserRolePanelWithCompany section="users" />)
     await waitFor(() => expect(screen.getByText('Demo User')).toBeInTheDocument())
     expect(screen.getByText('Demo Pharmacy Group')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'pharmacy' } })
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/users', { params: { per_page: 100, search: 'pharmacy' } }))
     fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'driver' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save role' })[0])
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/admin/users/12/role', expect.objectContaining({ role: 'driver' }), expect.anything()))
