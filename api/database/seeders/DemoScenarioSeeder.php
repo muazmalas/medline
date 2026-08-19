@@ -174,7 +174,7 @@ class DemoScenarioSeeder extends Seeder
 
     private function subscription(int $partnerId, int $submittedBy, int $reviewedBy): void
     {
-        DB::table('subscriptions')->updateOrInsert(['partner_id' => $partnerId, 'plan_code' => 'annual_pharmacy'], ['status' => 'active', 'amount' => 120000, 'duration_months' => 12, 'starts_at' => now()->toDateString(), 'ends_at' => now()->addYear()->toDateString(), 'updated_at' => now(), 'created_at' => now()]);
+        DB::table('subscriptions')->updateOrInsert(['partner_id' => $partnerId, 'plan_code' => 'annual_pharmacy'], ['status' => 'active', 'amount' => 12000, 'duration_months' => 12, 'starts_at' => now()->toDateString(), 'ends_at' => now()->addYear()->toDateString(), 'updated_at' => now(), 'created_at' => now()]);
         $subscriptionId = (int) DB::table('subscriptions')->where(['partner_id' => $partnerId, 'plan_code' => 'annual_pharmacy'])->value('id');
         DB::table('payment_proofs')->updateOrInsert(['subscription_id' => $subscriptionId, 'file_path' => 'demo/payments/annual-pharmacy-proof.pdf'], ['submitted_by' => $submittedBy, 'status' => 'approved', 'reviewed_by' => $reviewedBy, 'review_note' => 'Demo payment proof approved.', 'reviewed_at' => now(), 'updated_at' => now(), 'created_at' => now()]);
     }
