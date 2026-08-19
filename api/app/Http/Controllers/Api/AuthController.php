@@ -63,7 +63,7 @@ class AuthController extends Controller
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
                 'role' => $data['role'],
-                'status' => 'active',
+                'status' => in_array($data['role'], ['patient', 'driver'], true) ? 'pending' : 'active',
                 'locale' => $request->string('locale', 'en')->toString() === 'ar' ? 'ar' : 'en',
                 'password' => $data['password'],
             ]);
@@ -114,8 +114,13 @@ class AuthController extends Controller
             throw $exception;
         }
         $this->sendVerification($user);
-        if ($user->role !== 'patient') {
-            User::where('role', 'admin')->pluck('id')->each(fn ($adminId) => NotificationService::send($adminId, 'registration.submitted', ['user_id' => $user->id, 'role' => $user->role, 'message' => 'A new partner or driver application requires review.']));
+        User::where('role', 'admin')->pluck('id')->each(fn ($adminId) => NotificationService::send($adminId, 'registration.submitted', ['user_id' => $user->id, 'role' => $user->role, 'message' => 'A new ' . ($user->role === 'patient' ? 'customer' : $user->role) . ' application requires administrator approval.']));
+
+        if (in_array($user->role, ['patient', 'driver'], true)) {
+            return response()->json([
+                'message' => 'Registration submitted. An administrator must approve your account before you can sign in.',
+                'user' => $user,
+            ], 201);
         }
 
         [$accessToken, $refreshToken] = $this->issueSessionTokens($user);
@@ -148,7 +153,7 @@ class AuthController extends Controller
 
         if ($user->status !== 'active') {
             return response()->json([
-                'message' => 'This account is not active.',
+                'message' => $user->status === 'pending' ? 'Your account is awaiting administrator approval.' : 'This account is not active.',
                 'code' => 'AUTH_ACCOUNT_INACTIVE',
             ], 403);
         }

@@ -74,6 +74,13 @@ class AdminController extends Controller
         $user = DatabaseTransaction::run(function () use ($user, $data) {
             $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $locked->update(['status' => $data['status']]);
+            if ($locked->role === 'driver') {
+                DB::table('drivers')->where('user_id', $locked->id)->update([
+                    'approval_status' => $data['status'] === 'active' ? 'approved' : 'rejected',
+                    'is_available' => false,
+                    'updated_at' => now(),
+                ]);
+            }
             if ($data['status'] === 'suspended') {
                 $locked->tokens()->delete();
                 $locked->refreshTokens()->update(['revoked_at' => now(), 'updated_at' => now()]);
