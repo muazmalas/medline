@@ -183,9 +183,14 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .rich-operations-panel .operations-table { overflow-x: auto; padding-bottom: 8px; }
 .rich-operations-panel .operations-table .table-row { min-width: 1480px; }
 .rich-operations-panel .operations-table .table-head { position: sticky; top: 0; z-index: 1; background: #f5f9fb; }
-.content:has(.rich-operations-panel .table-head span:nth-child(9)) { max-width: none; padding-left: 5px; padding-right: 5px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) { max-width: none; padding: 4px 18px 48px; }
 .content:has(.rich-operations-panel .table-head span:nth-child(9)) > .welcome-row { display: none; }
-.content:has(.rich-operations-panel .table-head span:nth-child(9)) > .panel { padding-left: 5px; padding-right: 5px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) > .panel { padding-left: 18px; padding-right: 18px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) .row-actions .approve-button, .content:has(.rich-operations-panel .table-head span:nth-child(9)) .row-actions .reject-button { width: 44px; height: 44px; padding: 0; border-radius: 10px; font-size: 0; display: inline-grid; place-items: center; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) .row-actions .approve-button::before { content: '✓'; font-size: 25px; line-height: 1; font-weight: 900; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) .row-actions .reject-button::before { content: '×'; font-size: 28px; line-height: 1; font-weight: 700; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) .table-row > .ghost-button { width: 44px; height: 44px; padding: 0; justify-self: start; border: 1px solid #b9dce9; border-radius: 10px; background: #eef9fd; font-size: 0; display: inline-grid; place-items: center; }
+.content:has(.rich-operations-panel .table-head span:nth-child(9)) .table-row > .ghost-button::before { content: '↗'; color: #147fa8; font-size: 25px; font-weight: 900; }
 .rich-operations-panel .table-head { min-height: 46px; }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
 .stock-health { display: inline-flex; justify-self: start; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
