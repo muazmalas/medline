@@ -341,3 +341,17 @@ label:not(:has(input[required])):not(:has(select[required])):not(:has(textarea[r
   .driver-trip-metrics { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .driver-trips-card { padding: 20px; }
 }
+.notification-popover { width: min(430px, calc(100vw - 28px)); padding: 16px; }
+.notification-header { padding: 6px 8px 13px; font-size: 15px; }
+.notification-header > div { display: flex; gap: 14px; }
+.notification-header button { font-size: 12px; }
+.notification-row { gap: 14px; padding: 14px 9px; align-items: flex-start; }
+.notification-row strong { color: #17384e; font-size: 12px; font-weight: 800; }
+.notification-row span { color: #557284; font-size: 12px; line-height: 1.55; margin-top: 6px; overflow-wrap: anywhere; word-break: break-word; }
+.notification-table { overflow-x: auto; }
+.notification-table .table-row { min-width: 920px; grid-template-columns: minmax(190px, 1.1fr) minmax(360px, 2fr) minmax(180px, 1fr) minmax(130px, .7fr) minmax(150px, .8fr); min-height: 78px; padding: 16px 34px; gap: 26px; font-size: 14px; }
+.notification-table .table-row strong { font-size: 14px; color: #17384e; overflow-wrap: anywhere; }
+.notification-table .table-row > span:nth-child(2) { color: #557284; line-height: 1.55; overflow-wrap: anywhere; }
+.notification-table .status-pill { padding: 8px 14px; font-size: 12px; font-weight: 800; border: 1px solid #bde8d5; }
+.notification-table .notification-status-unread { color: #9b6810; background: #fff7e6; border-color: #f0d08a; }
+.notification-table .notification-status-read { color: #25815f; background: #eaf8f1; }
