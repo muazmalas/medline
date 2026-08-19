@@ -123,6 +123,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::post('/admin/verification-documents/{document}/decision', [VerificationDocumentController::class, 'decide'])->middleware('throttle:mutations');
         Route::get('/admin/partners', [AdminController::class, 'partners']);
         Route::get('/admin/partners/{partner}', [AdminController::class, 'partner']);
+        Route::get('/admin/drivers/{driver}', [AdminController::class, 'driver']);
         Route::get('/admin/deliveries', [AdminController::class, 'deliveries']);
         Route::get('/admin/subscriptions', [AdminController::class, 'subscriptions']);
         Route::get('/admin/complaints', [AdminController::class, 'complaints']);

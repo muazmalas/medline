@@ -33,7 +33,7 @@ class DeliveryController extends Controller
             ? DB::table('addresses')->where('id', $row->order_address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
             : ($dropoffPartnerId ? DB::table('partners')->where('id', $dropoffPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first() : null);
         $driver = $row->driver_id
-            ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $row->driver_id)->select('users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
+            ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $row->driver_id)->select('drivers.id as driver_id', 'users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
             : null;
         $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
         if (! in_array($row->status, ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'], true) || ! $row->location_updated_at || strtotime((string) $row->location_updated_at) < $locationFreshAfter->timestamp) {

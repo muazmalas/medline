@@ -45,7 +45,7 @@ class OrderController extends Controller
         $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
             $delivery->driver = $delivery->driver_id
-                ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $delivery->driver_id)->select('users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
+                ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $delivery->driver_id)->select('drivers.id as driver_id', 'users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
                 : null;
             if ($request->user()->role === 'patient' && $delivery->status !== 'delivered' && ! $delivery->pin_used_at && $delivery->pin_encrypted) $delivery->delivery_pin = Crypt::decryptString($delivery->pin_encrypted);
             $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
