@@ -1677,7 +1677,7 @@ php artisan key:generate
 php artisan storage:link
 ```
 
-The local `.env` contains secrets and must never be committed.
+For this localhost-only repository, the prepared `api/.env` and `web/.env` files are intentionally committed so installation is immediate. They contain only local database credentials, localhost keys, and development settings. Never reuse these values in staging or production; production `.env` files and provider credentials remain excluded from source control.
 
 ### Database migration and seeding
 
