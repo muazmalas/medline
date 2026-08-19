@@ -67,7 +67,7 @@ Every completed task should include a short note in the Implementation Log.
 | React status | Authenticated role-aware dashboards, localized metric cards, live operational refreshes, catalog, partner management, prescription review, procurement, privacy-scoped delivery monitoring with validated OpenStreetMap embedding, support, notifications, and settings implemented |
 | Flutter status | Role-gated shell, sign-in/session flow, patient ordering, partner queues, live dashboard metrics, driver delivery lifecycle, scoped encrypted offline mutation replay, Android flavors, and web host implemented |
 | Database status | Initial production-shaped schema migrated and seeded |
-| Testing status | Automated validation is in progress; interactive browser/device acceptance remains an owner check |
+| Testing status | Laravel 20 tests/50 assertions and React 3 UI tests pass; React coverage is 5.68% statements, while Laravel percentage coverage awaits Xdebug/PCOV; interactive browser/device acceptance remains an owner check |
 | Deployment status | Native Windows and Flutter mobile release handoff documentation created; IIS CSP now explicitly permits only the OpenStreetMap embed origin; signing/provider secrets remain deployment-owner configuration |
 | Last updated | 2026-08-19 |
 
@@ -1555,6 +1555,8 @@ Security/dependency scans
 - [x] Fixed PHP 8.2 nested ternary parse failures, Laravel query-builder `whereKey()` seeder failure, and the incompatible queued-job `$afterCommit` property.
 - [x] Added `NotificationBroadcastTest`; automated backend result: 17 tests and 38 assertions passed. Web `npm run build` passed. PHPUnit coverage command is currently unavailable because the installed PHP has no Xdebug/PCOV driver. Flutter analysis/test was attempted but the installed SDK initialization did not complete within the bounded run.
 - [x] Initialized the single root Git repository with `muazmalas@gmail.com` and remote `git@github.com:muazmalas/medline.git`; local `.env` files and toolchain artifacts remain ignored.
+- [x] Added Vitest/jsdom/Testing Library UI coverage for notification privacy filtering, login submission/token storage, and password-recovery navigation; added Laravel core workflow coverage for notification access, preferences, plans, and private-channel dispatch.
+- [x] Validation result: Laravel `php artisan test` passed 20 tests/50 assertions; API Vite build and React `npm run build` passed; React `npm run test:coverage` reported 5.68% statements, 2.27% branches, 2.79% functions, and 10.67% lines.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.

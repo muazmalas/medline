@@ -10,7 +10,7 @@ import './style.css'
 
 type Row = { id: number; primary: string; secondary: string; status: string; raw: Record<string, unknown> }
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api/v1', withCredentials: true })
+export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api/v1', withCredentials: true })
 let dashboardMetrics: Record<string, number> = {}
 const mutationConfig = (scope: string, id: number | string, action: string) => ({ headers: { 'Idempotency-Key': `web-${scope}-${id}-${action}` } })
 const uniqueMutationId = (scope: string) => typeof window.crypto?.randomUUID === 'function' ? `${scope}-${window.crypto.randomUUID()}` : `${scope}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -161,7 +161,7 @@ function WebNotifications({ locale }: { locale: string }) {
   return <div className="notification-wrap"><button className="icon-button" type="button" onClick={toggle} aria-label={tr('notifications', locale)} aria-expanded={open}><Bell size={19} />{rows.some((row) => row.read_at == null) && <i aria-hidden="true" />}</button>{open && <div className="notification-popover" role="region" aria-label={tr('notifications', locale)}><div className="notification-header"><strong>{tr('notifications', locale)}</strong><button type="button" onClick={() => void load()}>{tr('notificationsRefresh', locale)}</button></div>{rows.length === 0 ? <div className="state" role="status">{tr('noNotifications', locale)}</div> : rows.map((row) => <div className={`notification-row ${row.read_at == null ? 'unread' : ''}`} key={String(row.id)}><div><strong>{String(row.type ?? 'MedLine update')}</strong><span>{notificationText(row)}</span></div>{row.read_at == null && <button type="button" onClick={() => void markRead(String(row.id))}>{tr('read', locale)}</button>}</div>)}</div>}</div>
 }
 
-function notificationText(row: NotificationRecord): string {
+export function notificationText(row: NotificationRecord): string {
   const data = row.data
   if (typeof data === 'string') return data
   if (data && typeof data === 'object') {
@@ -277,7 +277,7 @@ export function AdminSettingsPage({ locale, onLocaleChange }: { locale: string; 
   return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{text('account')}</p><h1>{text('settings')}</h1><p className="muted">{text('settingsDescription')}</p></div></div><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">{text('language')}</p><h2>{text('interfaceDirection')}</h2></div></div><div className="setting-row"><span><strong>{text('language')}</strong><small>{text('languageHint')}</small></span><select aria-label={text('language')} value={locale} onChange={(event) => void onLocaleChange(event.target.value)}><option value="en">English · LTR</option><option value="ar">العربية · RTL</option></select></div><div className="panel-heading"><div><p className="eyebrow">{text('adminSecurity')}</p><h2>{text('authenticatorProtection')}</h2></div></div>{loading ? <div className="state">{text('loading')}</div> : <><p className="muted">{enabled ? 'Two-factor authentication is enabled.' : 'Two-factor authentication is not enabled.'}</p>{!enabled && <button className="primary-button" type="button" onClick={() => void setup()}>{text('generateSetupSecret')}</button>}{(secret || enabled) && <><p className="muted">{secret ? `Secret: ${secret}` : 'Enter your current authenticator code to disable 2FA.'}</p><input aria-label={text('authenticatorCode')} inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value)} placeholder={text('authenticatorCode')} /><div className="row-actions">{secret && <button className="approve-button" type="button" onClick={() => void confirm()}>{text('confirmTwoFactor')}</button>}{enabled && <button className="reject-button" type="button" onClick={() => void disable()}>{text('disableTwoFactor')}</button>}</div></>}</>}{message && <div className="form-success" role="status">{message}</div>}</section></section>
 }
 
-function LoginPage({ locale, onAuthenticated }: { locale: string; onAuthenticated: (user: Record<string, unknown>) => void }) {
+export function LoginPage({ locale, onAuthenticated }: { locale: string; onAuthenticated: (user: Record<string, unknown>) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [twoFactorCode, setTwoFactorCode] = useState('')

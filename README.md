@@ -79,6 +79,8 @@ cd api
 php artisan test
 
 cd ..\web
+npm run test
+npm run test:coverage
 npm run build
 
 cd ..\mobile
