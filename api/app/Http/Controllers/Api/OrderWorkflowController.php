@@ -36,6 +36,13 @@ class OrderWorkflowController extends Controller
             })
             ->latest()
             ->paginate(min($request->integer('per_page', 20), 50));
+        $orders->getCollection()->transform(function ($record) use ($partner) {
+            $record->customer_name = DB::table('users')->where('id', $record->patient_id)->value('name');
+            $record->pharmacy_name = $partner->business_name;
+            $record->driver_name = DB::table('deliveries')->join('drivers', 'drivers.id', '=', 'deliveries.driver_id')->join('users', 'users.id', '=', 'drivers.user_id')->where('deliveries.order_id', $record->id)->value('users.name');
+            $record->medicine_names = DB::table('order_items')->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')->where('order_items.order_id', $record->id)->pluck('medicines.name_en')->implode(', ');
+            return $record;
+        });
 
         return response()->json($orders);
     }

@@ -1577,6 +1577,7 @@ Security/dependency scans
 - [x] Added clickable driver cards and protected driver profiles with vehicle/contact details, total/accepted/in-progress/completed/cancelled trip metrics, trip history, actual durations, and estimated durations. Tests/build intentionally not run per owner instruction.
 - [x] Redesigned procurement and inventory operational tables with rich quick-view columns, added administrator procurement/inventory projections with pharmacy/warehouse ownership, stock health, quantities, pricing, and search, and added accepted/completed idempotent demo procurement scenarios. Tests/build intentionally not run per owner instruction.
 - [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
+- [x] Added browser-history routing for workspace URLs (`/orders`, `/inventory`, `/procurement`, `/deliveries`, and related sections), enriched order queues with customer/pharmacy/driver/medicine/destination/value details, and upgraded the medicine catalog with server-backed search, reliable CSV export handling, operational columns, and richer table styling. Tests/build intentionally not run per owner instruction.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
