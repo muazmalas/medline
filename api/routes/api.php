@@ -52,10 +52,6 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('throttle:mutations');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('throttle:auth');
         Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:auth');
-        Route::post('/auth/2fa/setup', [AuthController::class, 'twoFactorSetup'])->middleware('throttle:auth');
-        Route::get('/auth/2fa/status', [AuthController::class, 'twoFactorStatus']);
-        Route::post('/auth/2fa/confirm', [AuthController::class, 'twoFactorConfirm'])->middleware('throttle:auth');
-        Route::post('/auth/2fa/disable', [AuthController::class, 'twoFactorDisable'])->middleware('throttle:auth');
         Route::post('/devices/tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:mutations');
         Route::delete('/devices/tokens', [DeviceTokenController::class, 'destroy'])->middleware('throttle:mutations');
         Route::get('/user', fn (Request $request) => $request->user());

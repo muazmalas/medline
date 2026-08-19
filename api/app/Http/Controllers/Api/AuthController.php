@@ -107,14 +107,6 @@ class AuthController extends Controller
                 'code' => 'AUTH_ACCOUNT_INACTIVE',
             ], 403);
         }
-        if ($user->role === 'admin' && $user->two_factor_enabled) {
-            $code = $request->string('two_factor_code')->toString();
-            if (! preg_match('/^\d{6}$/', $code) || ! $this->validTotp(Crypt::decryptString($user->two_factor_secret), $code)) {
-                AuditService::record($request, 'auth.two_factor_failed', User::class, $user->id);
-                return response()->json(['message' => 'A valid administrator verification code is required.', 'code' => 'AUTH_TWO_FACTOR_REQUIRED'], 422);
-            }
-        }
-
         [$user, $token, $refreshToken] = DatabaseTransaction::run(function () use ($user) {
             $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             abort_unless($locked->status === 'active', 403, 'This account is not active.');

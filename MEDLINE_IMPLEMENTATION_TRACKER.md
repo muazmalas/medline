@@ -2085,3 +2085,12 @@ This roadmap is the high-level plan; the checked tracker items below it are the 
 - [x] Local registration uses the existing committed localhost environment and does not require a separate map API key.
 
 The location picker uses OpenStreetMap tiles and stores the selected coordinates in the partner profile. The address remains a human-readable registered address entered by the applicant; coordinates are used for maps, pickup planning, and operational verification. Production deployments must follow OpenStreetMap tile usage policy and use an approved tile provider or self-hosted service if traffic requires it.
+
+### Authentication scope decision
+
+- [x] Removed the authenticator-code field from login.
+- [x] Removed administrator 2FA enforcement from the login API.
+- [x] Removed public 2FA API routes and hid the legacy settings panel.
+- [x] Placed the registration entry point inside the login-card experience.
+
+The legacy database columns and dormant controller methods may remain in an existing database for backward-compatible migration safety, but they are no longer reachable through the API or user interface. If the database is rebuilt from migrations, these legacy columns can be removed in a later cleanup migration after confirming no external client depends on them.
