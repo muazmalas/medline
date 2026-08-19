@@ -42,6 +42,7 @@ class OrderWorkflowController extends Controller
             $record->pharmacy_name = $partner->business_name;
             $record->driver_name = DB::table('deliveries')->join('drivers', 'drivers.id', '=', 'deliveries.driver_id')->join('users', 'users.id', '=', 'drivers.user_id')->where('deliveries.order_id', $record->id)->value('users.name');
             $record->medicine_names = DB::table('order_items')->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')->where('order_items.order_id', $record->id)->pluck('medicines.name_en')->implode(', ');
+            $record->prescription_id = DB::table('prescriptions')->where('order_id', $record->id)->value('id');
             return $record;
         });
 
