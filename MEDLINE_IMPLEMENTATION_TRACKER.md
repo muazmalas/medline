@@ -1583,6 +1583,7 @@ Security/dependency scans
 - [x] Fixed partner directory navigation by clearing stale pharmacy/warehouse detail state when switching sections, and increased horizontal table-cell padding for clearer separation from borders and hover indicators. Tests/build intentionally not run per owner instruction.
 - [x] Consolidated pharmacy prescription review into the main Orders workspace by removing the duplicate prescription panel and adding backend `status` filtering to admin and pharmacy order queues. Prescription-review records now remain in the unified order table. Tests/build intentionally not run per owner instruction.
 - [x] Corrected the Orders rich-table grid so all columns stay on one aligned row, increased the Action column width, and kept Accept/Reject controls grouped separately inside the action cell; order projections now expose the related prescription ID for inline review workflows. Tests/build intentionally not run per owner instruction.
+- [x] Applied the full order-status bubble treatment to order queue statuses, converted status text to readable labels, and made rich operational tables horizontally scrollable with stable minimum widths to prevent column wrapping. Tests/build intentionally not run per owner instruction.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.

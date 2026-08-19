@@ -180,6 +180,9 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .content:has(> .panel.table-panel) > .panel.table-panel.rich-operations-panel .operations-table:has(.table-head span:nth-child(9)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(140px, 1fr) minmax(150px, 1.05fr) minmax(120px, .9fr) minmax(170px, 1.25fr) minmax(180px, 1.35fr) minmax(105px, .8fr) minmax(130px, .9fr) minmax(130px, .95fr); }
 .rich-operations-panel .row-actions { display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: nowrap; }
 .rich-operations-panel .row-actions button { white-space: nowrap; }
+.rich-operations-panel .operations-table { overflow-x: auto; padding-bottom: 8px; }
+.rich-operations-panel .operations-table .table-row { min-width: 1480px; }
+.rich-operations-panel .operations-table .table-head { position: sticky; top: 0; z-index: 1; background: #f5f9fb; }
 .rich-operations-panel .table-head { min-height: 46px; }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
 .stock-health { display: inline-flex; justify-self: start; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
