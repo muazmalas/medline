@@ -208,7 +208,7 @@ describe('MedLine UI core behavior', () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { message: 'ok' } } as never)
     const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: { message: 'ok' } } as never)
 
-    render(<PartnerManagementPanel section="partners" />)
+    render(<PartnerManagementPanel section="pharmacies" />)
     await waitFor(() => expect(screen.getByText('Demo Pharmacy')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
     await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/partners/11/decision', expect.objectContaining({ decision: 'correction' }), expect.anything()))

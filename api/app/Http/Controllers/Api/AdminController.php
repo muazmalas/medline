@@ -40,7 +40,13 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $users = User::query()->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('name', 'like', $like)->orWhere('email', 'like', $like)); })->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))->latest()->paginate(min($request->integer('per_page', 30), 100));
+        $users = User::query()
+            ->leftJoin('partners', 'partners.user_id', '=', 'users.id')
+            ->select('users.*', 'partners.business_name as company_name', 'partners.type as company_type')
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('users.name', 'like', $like)->orWhere('users.email', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })
+            ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('users.status', $request->string('status')->toString()))
+            ->latest('users.created_at')
+            ->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($users);
     }
 
@@ -102,7 +108,11 @@ class AdminController extends Controller
     public function partners(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $partners = Partner::query()->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('approval_status', $request->string('status')->toString()))->latest()->paginate(30);
+        $partners = Partner::query()
+            ->when($request->string('type')->isNotEmpty(), fn ($query) => $query->where('type', $request->string('type')->toString()))
+            ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('approval_status', $request->string('status')->toString()))
+            ->latest()
+            ->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($partners);
     }
 
