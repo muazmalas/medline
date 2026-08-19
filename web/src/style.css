@@ -256,11 +256,11 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .register-launch { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); color: #167ca5; font-weight: 700; font-size: 12px; line-height: 1.4; text-decoration: none; background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none; z-index: 3; }
 .register-launch:hover { color: #0d5878; text-decoration: underline; text-underline-offset: 3px; }
 .login-composite { position: relative; min-height: 100vh; }
-.login-composite .register-launch { left: calc(50% - 205px); top: calc(50% + 195px); bottom: auto; transform: none; }
+.login-composite .register-launch { left: calc(50% - 181px); top: calc(50% + 195px); bottom: auto; transform: none; }
 .login-card form .text-button { width: auto; margin-left: auto; text-align: right; }
 .login-card form:not(.registration-form) > label:nth-of-type(3) { display: none; }
 .two-factor-box { display: none !important; }
-@media (max-height: 600px) { .login-composite .register-launch { left: calc(50% - 205px); top: calc(50% + 180px); } }
+@media (max-height: 600px) { .login-composite .register-launch { left: calc(50% - 181px); top: calc(50% + 180px); } }
 .registration-page { min-height: 100vh; padding: 42px 6vw 64px; background: linear-gradient(135deg, #f4f9fb, #eaf5fa); color: #17384e; }
 .registration-shell { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(260px, .7fr) minmax(620px, 1.5fr); gap: 34px; align-items: start; }
 .registration-intro { padding: 30px 10px; position: sticky; top: 22px; }
