@@ -388,7 +388,6 @@ export function LoginPage({ locale, onAuthenticated }: { locale: string; onAuthe
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [twoFactorCode, setTwoFactorCode] = useState('')
-  const [twoFactorCode, setTwoFactorCode] = useState('')
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [resetRequested, setResetRequested] = useState(false)
   const [resetToken, setResetToken] = useState('')
