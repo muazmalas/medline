@@ -47,7 +47,7 @@ class AuthController extends Controller
                 'phone' => $data['phone'] ?? null,
                 'role' => $data['role'],
                 'status' => 'active',
-                'locale' => $request->string('locale', 'ar')->toString() === 'en' ? 'en' : 'ar',
+                'locale' => $request->string('locale', 'en')->toString() === 'ar' ? 'ar' : 'en',
                 'password' => $data['password'],
             ]);
 

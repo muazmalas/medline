@@ -102,16 +102,18 @@ function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(localStorage.getItem('medline_token')))
   const [role, setRole] = useState(() => { try { return JSON.parse(localStorage.getItem('medline_user') ?? '{}').role ?? 'admin' } catch { return 'admin' } })
   const [sessionReady, setSessionReady] = useState(!localStorage.getItem('medline_token'))
-  const [locale, setLocale] = useState(() => localStorage.getItem('medline_locale') ?? 'en')
+  const [locale, setLocale] = useState(() => localStorage.getItem('medline_locale_explicit') === 'true' ? (localStorage.getItem('medline_locale') ?? 'en') : 'en')
   const [section, setSection] = useState(() => sectionFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [subscriptionActive, setSubscriptionActive] = useState(role === 'admin')
   useEffect(() => {
     const handleUnauthorized = () => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }
     window.addEventListener('medline:unauthorized', handleUnauthorized)
     return () => window.removeEventListener('medline:unauthorized', handleUnauthorized)
   }, [])
-  useEffect(() => { if (!authenticated) { setSessionReady(true); return } setSessionReady(false); api.get('/auth/me').then((response) => { const user = response.data.user ?? {}; localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin'); if (user.locale === 'ar' || user.locale === 'en') setLocale(user.locale) }).catch(() => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }).finally(() => setSessionReady(true)) }, [authenticated])
-  useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('medline_locale', locale) }, [locale])
+  useEffect(() => { if (!authenticated) { setSessionReady(true); return } setSessionReady(false); api.get('/auth/me').then((response) => { const user = response.data.user ?? {}; localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin') }).catch(() => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }).finally(() => setSessionReady(true)) }, [authenticated])
+  useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('medline_locale', locale); localStorage.setItem('medline_locale_explicit', 'true') }, [locale])
+  useEffect(() => { if (!authenticated || role === 'admin') { setSubscriptionActive(role === 'admin'); return } setSubscriptionActive(false); api.get('/subscription').then((response) => setSubscriptionActive(['active', 'grace'].includes(String(response.data.subscription?.status ?? '')))).catch(() => setSubscriptionActive(false)) }, [authenticated, role])
   useEffect(() => { const handleRoute = () => setSection(sectionFromPath(window.location.pathname)); window.addEventListener('popstate', handleRoute); return () => window.removeEventListener('popstate', handleRoute) }, [])
   useEffect(() => {
     if (!authenticated) return
@@ -129,19 +131,21 @@ function App() {
     return () => { if (echo) echo.disconnect() }
   }, [authenticated])
   if (!sessionReady) return <div className="session-loading">Restoring your secure MedLine session...</div>
-  if (!authenticated) return section === 'register' ? <RegistrationPage onBack={() => { window.history.pushState({}, '', '/'); setSection('dashboard') }} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(String(user.role ?? 'patient')); if (user.locale === 'ar' || user.locale === 'en') setLocale(user.locale); setAuthenticated(true) }} /> : <div className="login-composite"><LoginPage locale={locale} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin'); if (user.locale === 'ar' || user.locale === 'en') setLocale(user.locale); setAuthenticated(true) }} /><a className="register-launch" href="/register">Create an account</a></div>
+  if (!authenticated) return section === 'register' ? <RegistrationPage onBack={() => { window.history.pushState({}, '', '/'); setSection('dashboard') }} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(String(user.role ?? 'patient')); setAuthenticated(true) }} /> : <div className="login-composite"><LoginPage locale={locale} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin'); setAuthenticated(true) }} /><a className="register-launch" href="/register">Create an account</a></div>
   const logout = async () => { try { await api.post('/auth/logout', {}) } catch { /* Continue local cleanup if the API is unavailable. */ } finally { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) } }
-  const nav = (value: string) => { window.history.pushState({}, '', pathForSection(value)); setSection(value); setSidebarOpen(false) }
+  const operationalAccess = role === 'admin' || subscriptionActive
+  useEffect(() => { if (authenticated && !operationalAccess && section !== 'subscriptions') { window.history.replaceState({}, '', '/subscriptions'); setSection('subscriptions') } }, [authenticated, operationalAccess, section])
+  const nav = (value: string) => { if (!operationalAccess && value !== 'subscriptions') value = 'subscriptions'; window.history.pushState({}, '', pathForSection(value)); setSection(value); setSidebarOpen(false) }
   return <div className="app-shell">
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand"><div className="brand-mark">M</div><div><strong>MedLine</strong><span>Healthcare logistics</span></div></div>
       <nav>
         <p className="nav-label">{tr('workspace', locale)}</p>
-        <NavItem active={section === 'dashboard'} onClick={() => nav('dashboard')} icon={<LayoutDashboard size={18} />} label={tr('dashboard', locale)} />
+        {operationalAccess && <><NavItem active={section === 'dashboard'} onClick={() => nav('dashboard')} icon={<LayoutDashboard size={18} />} label={tr('dashboard', locale)} />
         {role !== 'warehouse' && <NavItem active={section === 'orders'} onClick={() => nav('orders')} icon={<ClipboardList size={18} />} label={tr('orders', locale)} />}
         <NavItem active={section === 'inventory'} onClick={() => nav('inventory')} icon={<Package size={18} />} label={tr('inventory', locale)} />
         <NavItem active={section === 'procurement'} onClick={() => nav('procurement')} icon={<Package size={18} />} label={tr('procurement', locale)} />
-        {(role === 'admin' || role === 'patient' || role === 'driver' || role === 'pharmacy' || role === 'warehouse') && <NavItem active={section === 'deliveries'} onClick={() => nav('deliveries')} icon={<Truck size={18} />} label={tr('deliveries', locale)} />}
+        {(role === 'admin' || role === 'patient' || role === 'driver' || role === 'pharmacy' || role === 'warehouse') && <NavItem active={section === 'deliveries'} onClick={() => nav('deliveries')} icon={<Truck size={18} />} label={tr('deliveries', locale)} />}</>}
         <NavItem active={section === 'subscriptions'} onClick={() => nav('subscriptions')} icon={<CreditCard size={18} />} label={tr('subscriptions', locale)} />
         {role === 'admin' && <><NavItem active={section === 'complaints'} onClick={() => nav('complaints')} icon={<MessageSquare size={18} />} label={tr('complaints', locale)} /><NavItem active={section === 'ratings'} onClick={() => nav('ratings')} icon={<History size={18} />} label={tr('ratings', locale)} /><NavItem active={section === 'audit'} onClick={() => nav('audit')} icon={<History size={18} />} label={tr('audit', locale)} /></>}
         {role === 'admin' && <><p className="nav-label">{tr('management', locale)}</p>
@@ -156,7 +160,7 @@ function App() {
     </aside>
     {sidebarOpen && <button className="scrim" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />}
     <main className="main-content">
-      {(role === 'pharmacy' || role === 'warehouse') && <PartnerAccessGuard onOpen={() => nav('subscriptions')} />}
+      {(role === 'pharmacy' || role === 'warehouse') && <PartnerAccessGuard role={role} onOpen={() => nav('subscriptions')} />}
       {role === 'pharmacy' && <ProcurementCreatePanel section={section} />}
       <header className="topbar"><button className="icon-button menu-button" aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}><Menu size={22} /></button><div className="breadcrumb"><span>{tr('workspace', locale)}</span><ChevronRight size={15} /><strong>{tr(section, locale) || title(section)}</strong></div><div className="top-actions"><WebNotifications locale={locale} onOpenAll={() => nav('notifications')} /><div className="top-avatar" aria-label="Signed-in user">MA</div></div></header>
       {section === 'dashboard' ? <><LiveDashboard role={role} locale={locale} /><DashboardAlerts role={role} locale={locale} /><NotificationHealthPanel role={role} locale={locale} /></> : section === 'notifications' ? <NotificationsPage locale={locale} /> : section === 'subscriptions' && role !== 'admin' ? <PartnerSubscriptionPage locale={locale} /> : section === 'settings' ? <>{role === 'admin' ? <><SettingsPage role="patient" locale={locale} onLocaleChange={setLocale} /><AdminTwoFactorPanel locale={locale} /></> : <SettingsPage role={role} locale={locale} onLocaleChange={setLocale} />}<ConsentSettings /></> : section === 'inventory/categories' && role === 'admin' ? <><InventoryBackLink /><MedicineCategoryAdmin locale={locale} /></> : section === 'inventory' && role === 'admin' ? <><InventoryCategoryLink /><MedicineAdminPage locale={locale} /><MedicineEditAdminPage locale={locale} /></> : (section === 'pharmacies' || section === 'warehouses') && role === 'admin' ? <PartnerManagementPanel section={section} /> : section === 'users' && role === 'admin' ? <UserRolePanelWithCompany section={section} /> : <OperationsPage section={section} role={role} locale={locale} />}
@@ -232,11 +236,12 @@ export function ConsentSettings() {
   return <section className="content"><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">PRIVACY</p><h2>Consent and policy records</h2></div></div>{[['terms_of_service', 'Terms of service', 'Required to use MedLine.'], ['privacy_policy', 'Privacy policy', 'How MedLine handles account and medical data.'], ['marketing', 'Optional product updates', 'Non-essential MedLine communications.']].map(([key, label, description]) => <label className="setting-row" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" checked={Boolean(consents[key])} onChange={(event) => void update(key, event.target.checked)} /></label>)}{message && <div className="form-success">{message}</div>}</section></section>
 }
 
-export function PartnerAccessGuard({ onOpen }: { onOpen: () => void }) {
+export function PartnerAccessGuard({ role, onOpen }: { role: string; onOpen: () => void }) {
   const [status, setStatus] = useState<string | null>(null)
   useEffect(() => { api.get('/subscription').then((response) => setStatus(String(response.data.subscription?.status ?? 'inactive'))).catch(() => setStatus('unavailable')) }, [])
   if (status === null || status === 'active') return null
-  return <div className="access-banner"><div><strong>{status === 'unavailable' ? 'Subscription status unavailable' : 'Partner operations require an active subscription'}</strong><span>{status === 'unavailable' ? 'Check your connection or retry before processing operational work.' : 'Submit or review your annual payment proof to continue.'}</span></div><button className="ghost-button" onClick={onOpen}>Open subscription</button></div>
+  const organization = role === 'warehouse' ? 'Warehouse' : 'Pharmacy'
+  return <div className="access-banner"><div><strong>{status === 'unavailable' ? 'Subscription status unavailable' : `${organization} operations require an active subscription`}</strong><span>{status === 'unavailable' ? 'Check your connection or retry before processing operational work.' : 'Submit or review your annual payment proof to continue.'}</span></div><button className="ghost-button" onClick={onOpen}>Open subscription</button></div>
 }
 
 export function UserRolePanel({ section }: { section: string }) {
@@ -323,6 +328,7 @@ export function SettingsPage({ role, locale, onLocaleChange }: { role: string; l
   const disableTwoFactor = async () => undefined
   const changeLocale = async (next: string) => { onLocaleChange(next); try { await api.patch('/profile', { locale: next }, mutationConfig('profile-locale', 'self', next)) } catch { setMessage(tr('localePending', locale)) } }
   const text = (key: string) => tr(key, locale)
+  useEffect(() => { document.querySelectorAll('.settings-panel select option[value="ar"]').forEach((option) => { option.textContent = 'Arabic · RTL' }) }, [locale])
   return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{text('account')}</p><h1>{text('settings')}</h1><p className="muted">{text('settingsDescription')}</p></div></div><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">{text('language')}</p><h2>{text('interfaceDirection')}</h2></div></div><div className="setting-row"><span><strong>{text('language')}</strong><small>{text('languageHint')}</small></span><select aria-label={text('language')} value={locale} onChange={(event) => void changeLocale(event.target.value)}><option value="en">English · LTR</option><option value="ar">{'\\u0627\\u0644\\u0639\\u0631\\u0628\\u064a\\u0629'} · RTL</option></select></div><div className="panel-heading"><div><p className="eyebrow">{text('notifications')}</p><h2>{text('deliveryPreferences')}</h2></div></div>{loading ? <div className="state">{text('loadingPreferences')}</div> : Object.entries({ in_app_enabled: text('inAppNotifications'), push_enabled: text('pushNotifications'), email_enabled: text('emailNotifications'), sms_enabled: text('smsNotifications') }).map(([key, label]) => <label className="setting-row" key={key}><span><strong>{label}</strong><small>{text('channelHint')}</small></span><input type="checkbox" checked={Boolean(preferences[key])} onChange={(event) => void update(key, event.target.checked)} /></label>)}{role === 'admin' && <div className="two-factor-box"><div className="panel-heading"><div><p className="eyebrow">{text('adminSecurity')}</p><h2>{text('authenticatorProtection')}</h2></div></div><button className="primary-button" onClick={() => void setupTwoFactor()}>{text('generateSetupSecret')}</button>{twoFactorSecret && <><p className="muted">Secret: {twoFactorSecret}</p><input aria-label={text('authenticatorCode')} inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={(event) => setTwoFactorCode(event.target.value)} placeholder={text('authenticatorCode')} /><div className="row-actions"><button className="approve-button" onClick={() => void confirmTwoFactor()}>{text('confirmTwoFactor')}</button><button className="reject-button" onClick={() => void disableTwoFactor()}>{text('disableTwoFactor')}</button></div></>}{message && <div className="form-success">{message}</div>}</div>}</section></section>
 }
 
