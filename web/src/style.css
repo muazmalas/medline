@@ -175,6 +175,7 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .content:has(> .panel.table-panel) > .panel.table-panel .ghost-button { font-size: 14px; }
 .content:has(> .panel.table-panel) > .panel.table-panel .operations-table:has(.table-head span:nth-child(5)) .table-row { grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.5fr) minmax(210px, 1.5fr) minmax(110px, .7fr) minmax(100px, .6fr); }
 .rich-operations-panel .table-row { grid-template-columns: minmax(170px, 1.3fr) minmax(170px, 1.25fr) minmax(150px, 1.15fr) minmax(100px, .75fr) minmax(120px, .85fr) minmax(130px, .9fr); min-height: 72px; gap: 20px; }
+.rich-operations-panel:has(.table-head span:nth-child(7)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(150px, 1fr) minmax(160px, 1.1fr) minmax(105px, .75fr) minmax(120px, .85fr) minmax(130px, .9fr) minmax(115px, .8fr); }
 .rich-operations-panel:has(.table-head span:nth-child(9)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(140px, 1fr) minmax(150px, 1.05fr) minmax(120px, .9fr) minmax(170px, 1.25fr) minmax(180px, 1.35fr) minmax(105px, .8fr) minmax(130px, .9fr) minmax(100px, .7fr); }
 .rich-operations-panel .table-head { min-height: 46px; }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
@@ -185,6 +186,25 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .medicine-catalog-panel .table-head { min-height: 46px; }
 .medicine-catalog-panel strong { display: flex; flex-direction: column; gap: 5px; }
 .medicine-catalog-panel strong small { color: #7891a7; font-size: 12px; font-weight: 500; }
+.clickable-table-row { cursor: pointer; transition: background .18s ease, box-shadow .18s ease; }
+.clickable-table-row:hover, .clickable-table-row:focus-visible { background: #f8fcff; box-shadow: inset 4px 0 #1ba8d4; outline: none; }
+.detail-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+.detail-stat-grid > div { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border: 1px solid #d8e6ef; border-radius: 14px; background: #fff; }
+.detail-stat-grid small { color: #7190a6; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.detail-stat-grid strong { color: #0b3551; font-size: 14px; }
+.detail-items-table { overflow: hidden; border: 1px solid #e0ebf2; border-radius: 12px; }
+.detail-item-head, .detail-item-row { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(100px, .7fr)); gap: 16px; align-items: center; padding: 15px 18px; }
+.detail-item-head { color: #7891a7; background: #f7fafc; font-size: 10px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
+.detail-item-row { min-height: 68px; border-top: 1px solid #e7eef3; color: #5e7d94; }
+.detail-item-row strong { display: flex; flex-direction: column; gap: 4px; color: #0b4164; }
+.detail-item-row small { color: #7891a7; font-weight: 500; }
+.medicine-edit-table .table-row { grid-template-columns: minmax(200px, 1.3fr) minmax(160px, 1fr) minmax(170px, 1fr) minmax(130px, .8fr) minmax(220px, 1.4fr); min-height: 72px; gap: 18px; }
+.medicine-edit-table strong { display: flex; flex-direction: column; gap: 4px; }
+.medicine-edit-table strong small { color: #7891a7; font-size: 12px; font-weight: 500; }
+.medicine-edit-form { margin-top: 28px; padding-top: 24px; border-top: 1px solid #e1ebf2; }
+.content > .panel:first-of-type .inline-form { align-items: end; }
+.content > .panel:first-of-type .inline-form input, .content > .panel:first-of-type .inline-form select { min-height: 48px; }
+.content > .panel:first-of-type .inline-form .primary-button { min-height: 48px; }
 
 @media (max-width: 720px) {
   .content:has(> .panel.table-panel) { padding: 28px 18px 40px; }
@@ -205,6 +225,9 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
   .live-location-card { grid-column: auto; }
   .route-map { min-height: 390px; }
   .route-map-real { height: 390px; min-height: 390px; }
+  .detail-stat-grid { grid-template-columns: 1fr 1fr; }
+  .detail-item-head, .detail-item-row { min-width: 680px; }
+  .detail-items-table { overflow-x: auto; }
   .route-card .panel-heading { align-items: flex-start; flex-direction: column; }
   .route-card .panel-heading .ghost-button { align-self: flex-start; }
   .step-timeline { grid-template-columns: 1fr; gap: 15px; }

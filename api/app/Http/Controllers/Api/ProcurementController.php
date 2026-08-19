@@ -19,7 +19,7 @@ class ProcurementController extends Controller
     public function show(Request $request, int $procurement): JsonResponse
     {
         $partner = Partner::where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('subscription_status', 'active')->firstOrFail();
-        $order = DB::table('procurement_orders')->where('id', $procurement)->where(function ($query) use ($partner) { $query->where('pharmacy_id', $partner->id)->orWhere('warehouse_id', $partner->id); })->firstOrFail();
+        $order = DB::table('procurement_orders')->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')->where('procurement_orders.id', $procurement)->where(function ($query) use ($partner) { $query->where('procurement_orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.warehouse_id', $partner->id); })->select('procurement_orders.*', 'pharmacies.business_name as pharmacy_name', 'warehouses.business_name as warehouse_name')->firstOrFail();
         $items = DB::table('procurement_order_items')->join('medicines', 'medicines.id', '=', 'procurement_order_items.medicine_id')->where('procurement_order_id', $order->id)->get(['procurement_order_items.*', 'medicines.name_en', 'medicines.name_ar']);
         $delivery = DB::table('deliveries')->where('procurement_order_id', $order->id)->latest('id')->first();
         $timeline = $delivery ? DB::table('delivery_events')->where('delivery_id', $delivery->id)->orderBy('created_at')->get() : collect();
