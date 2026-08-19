@@ -384,3 +384,7 @@ label:not(:has(input[required])):not(:has(select[required])):not(:has(textarea[r
 .correction-status { color: #9b6810; background: #fff7e6; border-color: #f0d08a; }
 .correction-form { margin-top: 22px; }
 .correction-form .primary-button { justify-self: start; margin-top: 6px; }
+.prescription-upload-field { display: grid; gap: 7px; margin: 16px 0; padding: 14px 16px; border: 1px solid #efca83; border-radius: 12px; background: #fff9ed; color: #765317; font-size: 12px; font-weight: 800; }
+.prescription-upload-field em { color: #c75c63; font-style: normal; }
+.prescription-upload-field small { color: #96733a; font-size: 11px; font-weight: 500; line-height: 1.45; }
+.prescription-upload-field input[type=file] { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #e6c680; border-radius: 8px; background: #fff; color: #765317; font-weight: 600; }

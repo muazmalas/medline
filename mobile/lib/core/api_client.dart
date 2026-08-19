@@ -176,7 +176,7 @@ class ApiClient {
       request.headers.addAll({'Accept': 'application/json', 'X-Request-ID': _requestId(), if (token != null) 'Authorization': 'Bearer $token', if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey});
       request.fields['document_type'] = type;
       request.files.add(await http.MultipartFile.fromPath('document', filePath));
-      return _send(request.send());
+      return _sendStream(request.send());
     }
     return _decode(await _sendMultipartWithRetry(send, idempotencyKey), notifyUnauthorized: false);
   }
@@ -250,7 +250,7 @@ class ApiClient {
       request.headers.addAll({'Accept': 'application/json', 'X-Request-ID': _requestId(), if (token != null) 'Authorization': 'Bearer $token', if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey});
       payload.forEach((key, value) { if (value != null) request.fields[key] = value.toString(); });
       request.files.add(await http.MultipartFile.fromPath('attachment', filePath));
-      return _send(request.send());
+      return _sendStream(request.send());
     }
     return _decode(await _sendMultipartWithRetry(send, idempotencyKey), notifyUnauthorized: false);
   }
@@ -270,7 +270,7 @@ class ApiClient {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/orders/$orderId/prescription'));
       request.headers.addAll({'Accept': 'application/json', 'X-Request-ID': _requestId(), if (token != null) 'Authorization': 'Bearer $token', if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey});
       request.files.add(await http.MultipartFile.fromPath('prescription', filePath));
-      return _send(request.send());
+      return _sendStream(request.send());
     }
     return _decode(await _sendMultipartWithRetry(send, idempotencyKey), notifyUnauthorized: false);
   }
@@ -282,7 +282,7 @@ class ApiClient {
       request.fields['amount'] = amount.toString();
       if (planCode != null && planCode.isNotEmpty) request.fields['plan_code'] = planCode;
       request.files.add(await http.MultipartFile.fromPath('proof', filePath));
-      return _send(request.send());
+      return _sendStream(request.send());
     }
     late final http.Response response;
     try {
@@ -400,6 +400,20 @@ class ApiClient {
       final response = await operation.timeout(const Duration(seconds: 20));
       onConnectivityChanged?.call(true);
       return response;
+    } on TimeoutException {
+      onConnectivityChanged?.call(false);
+      throw const ApiException(0, 'The request timed out. Please retry when your connection is stable.');
+    } on http.ClientException {
+      onConnectivityChanged?.call(false);
+      throw const ApiException(0, 'The network is unavailable. Please check your connection and retry.');
+    }
+  }
+
+  Future<http.Response> _sendStream(Future<http.StreamedResponse> operation) async {
+    try {
+      final response = await operation.timeout(const Duration(seconds: 20));
+      onConnectivityChanged?.call(true);
+      return http.Response.fromStream(response);
     } on TimeoutException {
       onConnectivityChanged?.call(false);
       throw const ApiException(0, 'The request timed out. Please retry when your connection is stable.');

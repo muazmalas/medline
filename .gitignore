@@ -1,7 +1,3 @@
-api/.env
-api/.env.production
-web/.env
-web/.env.production
 mobile/.dart_tool/
 mobile/build/
 web/node_modules/
