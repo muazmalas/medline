@@ -52,6 +52,13 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 @media (prefers-contrast: more) { :root { color: #071d2b; }.panel, .metric-card, .notification-popover { border-color: #66808e; }.muted, .state, .breadcrumb, .activity-item span { color: #496675; }.status-pill, .live-status { border: 1px solid currentColor; } }
 .delivery-map { display: block; width: 100%; min-height: 220px; margin: 14px 0; border: 1px solid #dce7ed; border-radius: 10px; background: #eef5f7; }
 .order-detail-content { max-width: 1500px; }
+.order-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.order-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border: 1px solid #b9e7d1; border-radius: 999px; background: #e8f9f0; color: #21865d; font: 800 12px Manrope; text-transform: capitalize; box-shadow: 0 4px 12px #2e9d6d18; }
+.order-status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.order-status.status-pending-pharmacy-review, .order-status.status-prescription-review { border-color: #f0d49e; background: #fff8e8; color: #a87518; }
+.order-status.status-accepted, .order-status.status-in-transit, .order-status.status-pickup-started, .order-status.status-picked-up { border-color: #a9dcf0; background: #e8f7fc; color: #147fa8; }
+.order-status.status-completed, .order-status.status-delivered { border-color: #b9e7d1; background: #e8f9f0; color: #21865d; }
+.order-status.status-cancelled, .order-status.status-failed { border-color: #f0c1c1; background: #fff0f0; color: #bf5c61; }
 .partner-detail-content { max-width: 1500px; }
 .partner-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, .9fr); gap: 24px; }
 .partner-detail-grid .panel { padding: 28px; }
@@ -72,7 +79,8 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .invoice-lines strong { color: #17384e; }
 .invoice-lines .invoice-grand-total { padding-top: 21px; border-bottom: 0; color: #17384e; font-size: 17px; font-weight: 700; }
 .invoice-lines .invoice-grand-total strong { color: #117dab; font-size: 20px; }
-.payment-line { margin: 18px 0 0; }
+.payment-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0 0; color: #7892a1; font-size: 12px; }
+.payment-pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid #cfe3eb; border-radius: 999px; background: #eef8fb; color: #147fa8; font-size: 12px; font-weight: 800; text-transform: capitalize; }
 .driver-card { background: linear-gradient(145deg, #082f49 0%, #0e5775 100%); color: #fff; border-color: transparent; }
 .driver-card .eyebrow, .driver-card .muted { color: #a9d0df; }
 .driver-card h2 { color: #fff; }
