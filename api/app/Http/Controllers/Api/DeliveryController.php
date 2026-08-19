@@ -17,7 +17,7 @@ class DeliveryController extends Controller
 {
     public function show(Request $request, int $delivery): JsonResponse
     {
-        $row = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.id', $delivery)->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.patient_id', 'orders.pharmacy_id as order_pharmacy_id', 'procurement_orders.pharmacy_id as procurement_pharmacy_id', 'procurement_orders.warehouse_id', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->firstOrFail();
+        $row = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.id', $delivery)->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.patient_id', 'orders.address_id as order_address_id', 'orders.pharmacy_id as order_pharmacy_id', 'procurement_orders.pharmacy_id as procurement_pharmacy_id', 'procurement_orders.warehouse_id', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->firstOrFail();
         $allowed = $request->user()->role === 'admin' || (int) $row->patient_id === (int) $request->user()->id;
         if ($request->user()->role === 'driver') $allowed = (int) DB::table('drivers')->where('user_id', $request->user()->id)->value('id') === (int) $row->driver_id;
         if (in_array($request->user()->role, ['pharmacy', 'warehouse'], true)) {
@@ -26,6 +26,15 @@ class DeliveryController extends Controller
         }
         abort_unless($allowed, 403);
         $events = DB::table('delivery_events')->where('delivery_id', $delivery)->orderBy('created_at')->get();
+        $pickupPartnerId = (int) ($row->order_pharmacy_id ?: $row->warehouse_id);
+        $dropoffPartnerId = (int) ($row->procurement_pharmacy_id ?: 0);
+        $pickup = DB::table('partners')->where('id', $pickupPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first();
+        $dropoff = $row->order_address_id
+            ? DB::table('addresses')->where('id', $row->order_address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
+            : ($dropoffPartnerId ? DB::table('partners')->where('id', $dropoffPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first() : null);
+        $driver = $row->driver_id
+            ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $row->driver_id)->select('users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
+            : null;
         $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
         if (! in_array($row->status, ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'], true) || ! $row->location_updated_at || strtotime((string) $row->location_updated_at) < $locationFreshAfter->timestamp) {
             $row->last_latitude = null;
@@ -33,8 +42,9 @@ class DeliveryController extends Controller
             $row->location_accuracy_meters = null;
             $row->location_updated_at = null;
         }
-        unset($row->patient_id, $row->order_pharmacy_id, $row->procurement_pharmacy_id, $row->warehouse_id);
-        return response()->json(['delivery' => $row, 'events' => $events]);
+        unset($row->patient_id, $row->order_address_id, $row->order_pharmacy_id, $row->procurement_pharmacy_id, $row->warehouse_id);
+        $row->driver = $driver;
+        return response()->json(['delivery' => $row, 'route' => ['pickup' => $pickup, 'dropoff' => $dropoff], 'events' => $events]);
     }
 
     public function mine(Request $request): JsonResponse

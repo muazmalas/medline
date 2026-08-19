@@ -30,7 +30,7 @@ class DemoScenarioSeeder extends Seeder
 
         DB::table('partners')->updateOrInsert(['user_id' => $pharmacyUser->id], [
             'type' => 'pharmacy', 'business_name' => 'Demo Central Pharmacy', 'license_number' => 'MEDLINE-DEMO-PH-001',
-            'phone' => '+963912345680', 'address' => 'Damascus, University District', 'approval_status' => 'approved',
+            'phone' => '+963912345680', 'address' => 'Damascus, University District', 'latitude' => 33.5150, 'longitude' => 36.2780, 'approval_status' => 'approved',
             'subscription_status' => 'active', 'updated_at' => now(), 'created_at' => now(),
         ]);
         $pharmacyId = (int) DB::table('partners')->where('user_id', $pharmacyUser->id)->value('id');

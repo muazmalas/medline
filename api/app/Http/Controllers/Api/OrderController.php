@@ -61,10 +61,18 @@ class OrderController extends Controller
             ? DB::table('delivery_events')->where('delivery_id', $delivery->id)->select('from_status', 'to_status', 'note', 'created_at')->orderBy('created_at')->get()
             : collect();
         $rating = DB::table('ratings')->where('order_id', $order->id)->where('created_by', $request->user()->id)->select('score', 'comment', 'created_at')->first();
+        $pickup = DB::table('partners')->where('id', $order->pharmacy_id)->select('business_name as label', 'address', 'latitude', 'longitude')->first();
+        $dropoff = $order->address_id
+            ? DB::table('addresses')->where('id', $order->address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
+            : null;
 
         return response()->json([
             'order' => $order,
             'delivery' => $delivery,
+            'route' => [
+                'pickup' => $pickup,
+                'dropoff' => $dropoff,
+            ],
             'timeline' => $events,
             'rating' => $rating,
             'invoice' => [
