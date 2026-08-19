@@ -288,6 +288,7 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .registration-grid input { width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid #d5e5eb; border-radius: 9px; padding: 11px 12px; outline: none; color: #17384e; background: #fbfdfe; font-size: 13px; }
 .registration-grid input:focus { border-color: #52b8d8; box-shadow: 0 0 0 3px #e2f5fb; background: #fff; }
 .registration-grid input.registration-invalid { border-color: #d85c67; background: #fff5f5; box-shadow: 0 0 0 3px #fde4e6; }
+.registration-grid input.registration-invalid:focus { border-color: #c43f4e; box-shadow: 0 0 0 3px #f8cdd2; }
 label { position: relative; }
 label:has(input[required])::after, label:has(select[required])::after, label:has(textarea[required])::after { content: '(Required)'; position: absolute; top: 0; right: 0; color: #c75c63; font-size: 10px; font-weight: 800; }
 label:not(:has(input[required])):not(:has(select[required])):not(:has(textarea[required])):has(input, select, textarea)::after { content: '(Optional)'; position: absolute; top: 0; right: 0; color: #8ca0aa; font-size: 10px; font-weight: 700; }
