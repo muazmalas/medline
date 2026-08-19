@@ -63,11 +63,15 @@ class DemoScenarioSeeder extends Seeder
         $orders['cancelled'] = $this->order('DEMO-ORDER-CANCEL-001', $patient->id, $pharmacyId, $addressId, 'cancelled', $ibuprofenId, 1, 750);
 
         $this->prescription($orders['prescription'], $patient->id, $admin->id, 'pending_review');
-        $this->delivery($orders['pending'], null, 'available', null, null);
-        $this->delivery($orders['prescription'], null, 'available', null, null);
+        // Orders awaiting pharmacy/prescription review do not have a delivery yet.
+        // A delivery is created only after the order reaches an accepted state.
+        $preReviewOrderIds = [$orders['pending'], $orders['prescription']];
+        $staleDeliveryIds = DB::table('deliveries')->whereIn('order_id', $preReviewOrderIds)->pluck('id');
+        DB::table('delivery_events')->whereIn('delivery_id', $staleDeliveryIds)->delete();
+        DB::table('deliveries')->whereIn('id', $staleDeliveryIds)->delete();
         $this->delivery($orders['transit'], $driverId, 'in_transit', '34.8020750', '38.9968150');
         $completedDeliveryId = $this->delivery($orders['completed'], $driverId, 'delivered', '34.8020750', '38.9968150');
-        $this->delivery($orders['cancelled'], null, 'failed', null, null);
+        $this->delivery($orders['cancelled'], null, 'cancelled', null, null);
         $this->deliveryEvents($orders['transit'], $driver->id);
         $this->rating($orders['completed'], $patient->id);
 
