@@ -207,6 +207,7 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .sortable-header:hover, .sortable-header.active { color: #147fa8; }
 .sortable-header.active { font-weight: 800; }
 .rich-operations-panel .table-head { min-height: 46px; }
+.rich-operations-panel .sortable-header { white-space: nowrap; overflow: visible; }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
 .stock-health { display: inline-flex; justify-self: start; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
 .stock-health.healthy { background: #e8f9f0; color: #21865d; }
