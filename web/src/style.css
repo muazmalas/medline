@@ -202,10 +202,10 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .medicine-edit-table strong { display: flex; flex-direction: column; gap: 4px; }
 .medicine-edit-table strong small { color: #7891a7; font-size: 12px; font-weight: 500; }
 .medicine-edit-form { margin-top: 28px; padding-top: 24px; border-top: 1px solid #e1ebf2; }
-.operations-table > .table-row:not(.table-head), .driver-trip-row:not(.driver-trip-head) { padding-left: 16px; padding-right: 16px; }
+.operations-table > .table-row:not(.table-head), .driver-trip-row:not(.driver-trip-head) { padding-left: 22px; padding-right: 22px; }
 .operations-table > .table-row:not(.table-head):nth-child(even), .driver-trip-row:not(.driver-trip-head):nth-child(even) { background: #fbfdfe; }
 .operations-table > .table-row:not(.table-head):hover, .operations-table > .table-row:not(.table-head):focus-visible, .driver-trip-row:not(.driver-trip-head):hover, .driver-trip-row:not(.driver-trip-head):focus-visible { background: #f0f9fd; box-shadow: inset 4px 0 #20a9d6; outline: none; }
-.driver-trip-row { grid-template-columns: 1.5fr 1fr 1.3fr .8fr .8fr 1fr; padding-left: 16px; padding-right: 16px; }
+.driver-trip-row { grid-template-columns: 1.5fr 1fr 1.3fr .8fr .8fr 1fr; padding-left: 22px; padding-right: 22px; }
 .driver-trip-clickable { cursor: pointer; transition: background .18s ease, box-shadow .18s ease; }
 .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 22px; padding: 16px 4px 0; border-top: 1px solid #e5edf2; color: #6f899b; font-size: 13px; }
 .table-pagination .ghost-button:disabled { cursor: not-allowed; opacity: .45; }

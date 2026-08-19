@@ -265,6 +265,7 @@ export function PartnerManagementPanel({ section }: { section: string }) {
   const partnerType = section === 'warehouses' ? 'warehouse' : 'pharmacy'
   const title = partnerType === 'warehouse' ? 'Warehouses' : 'Pharmacies'
   const load = async () => { try { const response = await api.get('/admin/partners', { params: { type: partnerType, search, per_page: 100 } }); setPartners(response.data.data ?? []) } catch { setPartners([]) } }
+  useEffect(() => { setSelectedPartner(null); setMessage('') }, [section])
   useEffect(() => { if (section === 'pharmacies' || section === 'warehouses') void load() }, [section, search])
   const decide = async (id: number, decision: 'approve' | 'reject' | 'correction') => { try { await api.post(`/admin/partners/${id}/decision`, { decision, note: decision === 'correction' ? 'Please provide corrected partner documentation.' : undefined }, mutationConfig('partner-decision', id, decision)); setMessage(`Partner ${decision === 'correction' ? 'sent for correction' : `${decision}d`}.`); await load() } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to update partner.' : 'Unable to update partner.') } }
   const viewPartner = async (id: number) => { try { const response = await api.get(`/admin/partners/${id}`); setSelectedPartner(response.data.partner ?? null) } catch { setMessage('Unable to load partner details.') } }
