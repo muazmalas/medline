@@ -115,6 +115,7 @@ function App() {
   useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('medline_locale', locale); localStorage.setItem('medline_locale_explicit', 'true') }, [locale])
   useEffect(() => { if (!authenticated || role === 'admin') { setSubscriptionActive(role === 'admin'); return } setSubscriptionActive(false); api.get('/subscription').then((response) => setSubscriptionActive(['active', 'grace'].includes(String(response.data.subscription?.status ?? '')))).catch(() => setSubscriptionActive(false)) }, [authenticated, role])
   useEffect(() => { const handleRoute = () => setSection(sectionFromPath(window.location.pathname)); window.addEventListener('popstate', handleRoute); return () => window.removeEventListener('popstate', handleRoute) }, [])
+  useEffect(() => { const openMetric = (event: Event) => { const target = event.target as HTMLElement; const card = target.closest('.metric-card'); if (!card) return; const label = card.querySelector('.metric-copy span')?.textContent ?? ''; const destination = label.includes('orders') ? '/orders' : label.includes('verification') ? '/verification' : label.includes('delivery') ? '/deliveries' : label.includes('organization') ? '/pharmacies' : ''; if (destination) { window.history.pushState({}, '', destination); window.dispatchEvent(new Event('popstate')) } }; document.addEventListener('click', openMetric); return () => document.removeEventListener('click', openMetric) }, [])
   useEffect(() => {
     if (!authenticated) return
     const token = localStorage.getItem('medline_token')
@@ -130,11 +131,11 @@ function App() {
     } catch { /* Realtime is optional; polling remains available if Reverb is stopped. */ }
     return () => { if (echo) echo.disconnect() }
   }, [authenticated])
+  const operationalAccess = role === 'admin' || subscriptionActive
+  useEffect(() => { if (authenticated && !operationalAccess && section !== 'subscriptions') { window.history.replaceState({}, '', '/subscriptions'); setSection('subscriptions') } }, [authenticated, operationalAccess, section])
   if (!sessionReady) return <div className="session-loading">Restoring your secure MedLine session...</div>
   if (!authenticated) return section === 'register' ? <RegistrationPage onBack={() => { window.history.pushState({}, '', '/'); setSection('dashboard') }} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(String(user.role ?? 'patient')); setAuthenticated(true) }} /> : <div className="login-composite"><LoginPage locale={locale} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin'); setAuthenticated(true) }} /><a className="register-launch" href="/register">Create an account</a></div>
   const logout = async () => { try { await api.post('/auth/logout', {}) } catch { /* Continue local cleanup if the API is unavailable. */ } finally { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) } }
-  const operationalAccess = role === 'admin' || subscriptionActive
-  useEffect(() => { if (authenticated && !operationalAccess && section !== 'subscriptions') { window.history.replaceState({}, '', '/subscriptions'); setSection('subscriptions') } }, [authenticated, operationalAccess, section])
   const nav = (value: string) => { if (!operationalAccess && value !== 'subscriptions') value = 'subscriptions'; window.history.pushState({}, '', pathForSection(value)); setSection(value); setSidebarOpen(false) }
   return <div className="app-shell">
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
