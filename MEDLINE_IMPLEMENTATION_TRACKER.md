@@ -1602,3 +1602,250 @@ Security/dependency scans
 - [ ] Prescription OCR with pharmacist confirmation.
 - [ ] Advanced analytics and demand forecasting.
 - [ ] Partner service-level agreements.
+
+## Complete operating guide
+
+This section is the single practical guide for a new developer, demonstrator, or operator. The project is intentionally native and localhost-first: Windows, PHP, Composer, Laravel, MySQL, Node/npm, React/Vite, and Flutter are used directly. Docker, Redis, ClamAV, online payments, and pilot/release operations are not required for the current localhost demonstration.
+
+### Repository layout
+
+- `api/` — Laravel REST API, migrations, seeders, authentication, transactions, notifications, queues, and private file handling.
+- `web/` — React TypeScript operations portal.
+- `mobile/` — Flutter Android application for patient, pharmacy, warehouse, and driver workflows.
+- `docs/` — API, domain, security, notification, testing, recovery, release, and architecture references.
+- `deploy/` and `scripts/` — native Windows startup, health, backup, scheduler, queue, and release utilities.
+- `MEDLINE_IMPLEMENTATION_TRACKER.md` — the continuation source of truth. Update the checklist after every meaningful change.
+
+### Local prerequisites
+
+Install and place on `PATH`:
+
+- PHP 8.2 or newer with `pdo_mysql`, `openssl`, `mbstring`, `fileinfo`, `curl`, and `zip` enabled.
+- Composer.
+- MySQL 8 (`MySQL80` Windows service).
+- Node.js/npm.
+- Flutter SDK and Android Studio/Android SDK for Android testing.
+- Git and the configured SSH identity for the repository.
+
+Do not install or start Docker for this project. Redis is intentionally not used for localhost; Laravel uses the database queue and database cache drivers. ClamAV is disabled for local testing because upload scanning is optional and no scanner service is required in this environment.
+
+### First-time MySQL setup
+
+Create the local database before running migrations. The supplied localhost values are `localhost`, user `root`, password `root`, database `medline`.
+
+```powershell
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS medline CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+When prompted, enter the local MySQL password. If MySQL is configured for an empty root password, omit `-p` or adjust `api/.env` accordingly. Never use this root account for production.
+
+### Configure the Laravel API
+
+```powershell
+cd api
+Copy-Item .env.example .env
+```
+
+Set these local values in `api/.env`:
+
+```dotenv
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://127.0.0.1:8000
+APP_KEY=base64:GENERATED_BY_ARTISAN
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=medline
+DB_USERNAME=root
+DB_PASSWORD=root
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+BROADCAST_CONNECTION=reverb
+MAIL_MAILER=log
+MEDLINE_UPLOAD_SCAN_ENABLED=false
+MEDLINE_CURRENCY=SYP
+MEDLINE_TAX_RATE=0
+MEDLINE_DELIVERY_FEE=2500
+MEDLINE_SUBSCRIPTION_GRACE_PERIOD_DAYS=7
+```
+
+Generate the application key and prepare storage:
+
+```powershell
+php artisan key:generate
+php artisan storage:link
+```
+
+The local `.env` contains secrets and must never be committed.
+
+### Database migration and seeding
+
+Run normal migrations when preserving existing local data:
+
+```powershell
+cd api
+php artisan migrate
+php artisan db:seed --class=DemoScenarioSeeder
+```
+
+`DemoScenarioSeeder` is designed to be idempotent and creates active demonstration data for patients, pharmacy, warehouse, driver, orders, prescriptions, deliveries, delivery events, procurement, inventory, notifications, and role scenarios. Re-running it refreshes the known demo records without requiring Docker.
+
+To completely rebuild the disposable local database:
+
+```powershell
+php artisan migrate:fresh --seed
+```
+
+Warning: `migrate:fresh` drops every table in the configured database. Use it only with the local `medline` database, never with shared or production data.
+
+Useful migration commands:
+
+```powershell
+php artisan migrate:status
+php artisan migrate:rollback --step=1
+php artisan migrate --pretend
+```
+
+The correct deployment migration command is `php artisan migrate --force`; do not use `migrate:fresh` outside disposable localhost development.
+
+### Start the localhost services
+
+Start the API in one PowerShell window:
+
+```powershell
+cd api
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+Start the React portal in another window:
+
+```powershell
+cd web
+Copy-Item .env.example .env
+npm install
+npm run dev -- --host 127.0.0.1 --port=3001
+```
+
+If Vite reports an unused port argument, use the equals form:
+
+```powershell
+npm run dev -- --host=127.0.0.1 --port=3001
+```
+
+The portal is at `http://127.0.0.1:3001`. The API is at `http://127.0.0.1:8000` and the API prefix is `/api/v1`.
+
+Convenience scripts from the repository root:
+
+```powershell
+.\scripts\start-api.ps1
+.\scripts\start-web.ps1
+.\scripts\start-queue.ps1
+```
+
+### Local email and in-app notifications
+
+Local email uses Laravel's log mailer. It does not send real email. Trigger an operation that creates a notification, then inspect:
+
+```powershell
+Get-Content api\storage\logs\laravel.log -Wait
+```
+
+In-app notifications are available from the bell icon. The notification popover shows recent records; `View all` opens `/notifications`, where users can search, mark notifications read, and delete them. Realtime Echo/Reverb is optional; polling still refreshes the inbox. To run local Reverb when desired:
+
+```powershell
+cd api
+php artisan reverb:start --host=127.0.0.1 --port=8080
+```
+
+The API and web `.env` Reverb values must match. Email, in-app notification, and queue behavior are separate: use the database queue worker for queued notifications:
+
+```powershell
+cd api
+php artisan queue:work --tries=3 --backoff=5
+```
+
+### Demo accounts
+
+The seeded administrator is `admin@medline.local` with password `ChangeMe123!`. The seeder also creates demo patient, driver, pharmacy, warehouse, and support accounts. Use the current seeded account list from the seeder or the Users view; change all passwords before any shared environment.
+
+### Portal demonstration flow
+
+1. Sign in as administrator and open `/orders`.
+2. Use search and the status filter; click column headings to sort.
+3. Click a row or eye action to open order detail, including customer, pharmacy, driver, medicines, invoice, route map, and delivery timeline.
+4. Open `/pharmacies` or `/warehouses` and select a row for profile and OpenStreetMap location details.
+5. Open `/procurement` to review pharmacy-to-warehouse requests, quantities, values, status, and delivery details.
+6. Open `/inventory` for stock, reservations, pricing, and low-stock information; use Categories for category administration.
+7. Click the notification bell, then `View all` to review the notification table.
+8. Sign in as pharmacy, warehouse, driver, or patient to verify role-scoped screens and actions.
+
+### Mobile Android localhost testing
+
+Start the API on `127.0.0.1:8000`, then identify the development machine LAN address for a physical Android phone. A physical device cannot use `127.0.0.1` to reach the PC. Use the PC IPv4 address, for example `http://192.168.1.20:8000/api/v1`, and permit that local network through the Windows firewall if required.
+
+For an Android emulator, use `10.0.2.2`:
+
+```powershell
+cd mobile
+flutter pub get
+flutter run --dart-define=MEDLINE_API_URL=http://10.0.2.2:8000/api/v1
+```
+
+For a physical Android device:
+
+```powershell
+flutter run --dart-define=MEDLINE_API_URL=http://YOUR_PC_LAN_IP:8000/api/v1
+```
+
+The mobile application uses secure token storage. Critical order, payment, prescription, upload, and delivery mutations remain online-only; only safe preference/profile/availability updates may use the bounded offline queue.
+
+### Validation commands
+
+These are available when validation is explicitly requested:
+
+```powershell
+cd api
+php artisan test
+
+cd ..\web
+npm run test
+npm run test:coverage
+npm run build
+
+cd ..\mobile
+flutter analyze
+flutter test --coverage
+```
+
+The project owner currently requested that tests, builds, and browser-based UI tests not be run automatically. The commands are documented for deliberate manual validation only. Keep compilation parallelism at four jobs or fewer when a tool exposes a job flag.
+
+### Native deployment sequence
+
+This is the deployment order for a non-Docker Windows host:
+
+1. Provision MySQL and create a restricted application database user.
+2. Copy `api/.env.production.example` to a protected `api/.env` and populate secrets.
+3. Set `APP_ENV=production`, `APP_DEBUG=false`, HTTPS URLs, secure cookies, explicit CORS origins, private storage, mail/push provider values, and a production `APP_KEY`.
+4. Install dependencies: `composer install --no-dev --optimize-autoloader` in `api`, and `npm ci` in `web`.
+5. Run `php artisan migrate --force` from the API release directory. Never run `migrate:fresh` in deployment.
+6. Run `php artisan config:cache`, `php artisan route:cache`, and `php artisan view:cache` after environment values are final.
+7. Keep prescriptions and payment proofs outside public hosting; do not expose private storage through IIS.
+8. Run the queue worker and scheduler as restricted Windows tasks/services.
+9. Build the React portal with `npm run build` and publish only `web/dist` through IIS with route fallback.
+10. Configure HTTPS, health checks, backups, CORS, private-file ACLs, and monitoring.
+11. Verify `GET /api/v1/health` and `GET /api/v1/health/ready` before opening traffic.
+12. Record the release manifest and migration revision, then perform an approved smoke test.
+
+Production configuration, backup, scheduler, health-check, release-manifest, Android signing, and recovery procedures are documented in `deploy/windows/`, `deploy/mobile/`, and `docs/`. These procedures require owner-supplied secrets and are not part of localhost demo setup.
+
+### Recovery and troubleshooting
+
+- API cannot connect to MySQL: verify the `MySQL80` service, database name, port, and `api/.env`; then run `php artisan config:clear`.
+- Portal shows network errors: confirm API port 8000, `web/.env` `VITE_API_URL`, CORS origins, and that both processes are running.
+- Old configuration remains: run `php artisan optimize:clear` and restart the API.
+- Notifications are visible but email is not received: expected with `MAIL_MAILER=log`; inspect `api/storage/logs/laravel.log`.
+- Realtime is unavailable: start Reverb or continue using polling; Redis is not required.
+- Android cannot reach API: use `10.0.2.2` for emulator or the PC LAN IP for a physical device, not `127.0.0.1`.
+- Seed data is inconsistent: confirm the correct database in `.env`, then run `php artisan db:seed --class=DemoScenarioSeeder`; use `migrate:fresh --seed` only for disposable local data.
+- Never fix a production issue by deleting tables, resetting the database, or exposing private files. Follow `docs/OPERATIONS_RECOVERY_RUNBOOK.md`.
