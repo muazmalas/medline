@@ -144,5 +144,7 @@ class DatabaseSeeder extends Seeder
             ['medicine_id' => $ibuprofen->id, 'owner_type' => 'warehouse', 'owner_id' => $warehouse->id],
             ['quantity' => 700, 'reserved_quantity' => 0, 'unit_price' => 600, 'low_stock_threshold' => 50, 'updated_at' => now(), 'created_at' => now()],
         );
+
+        $this->call(DemoScenarioSeeder::class);
     }
 }
