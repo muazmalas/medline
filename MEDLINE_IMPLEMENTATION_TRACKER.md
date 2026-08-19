@@ -1588,6 +1588,7 @@ Security/dependency scans
 - [x] Added a visible Orders status filter with Laravel-backed exact status filtering for pending pharmacy review, prescription review, accepted, in-transit, completed, and cancelled orders; the filter is integrated with the existing table pagination controls. Tests/build intentionally not run per owner instruction.
 - [x] Tightened the Orders workspace to the top of the viewport, increased table side padding, and converted order action controls to large icon-only buttons for view, accept, and reject actions. Tests/build intentionally not run per owner instruction.
 - [x] Corrected idempotent demo delivery scenarios so pre-review orders have no delivery, accepted/transit and completed orders have compatible delivery states, and cancelled orders use `cancelled`; stale pre-review demo deliveries are removed on reseed. Replaced CSS glyph actions with Lucide Eye, FileCheck2, and FileX2 icons with accessible labels/tooltips. Tests/build intentionally not run per owner instruction.
+- [x] Increased the content inset between the Orders hover bar and row text, and compacted pagination into a right-aligned group with the status filter kept at the group’s left edge. Tests/build intentionally not run per owner instruction.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
