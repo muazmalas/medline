@@ -59,7 +59,7 @@ class ProcurementController extends Controller
         }
         $data = $request->validate([
             'warehouse_id' => ['required', 'integer', 'exists:partners,id'],
-            'delivery_address_snapshot' => ['required', 'string', 'max:1000'],
+            'delivery_address_snapshot' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.medicine_id' => ['required', 'integer', 'exists:medicines,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:10000'],
@@ -73,7 +73,7 @@ class ProcurementController extends Controller
             if (! $warehouse) abort(422, 'The warehouse account is no longer available.');
             $order = DB::table('procurement_orders')->insertGetId([
                 'public_id' => (string) Str::ulid(), 'pharmacy_id' => $pharmacy->id, 'warehouse_id' => $warehouse->id,
-                'status' => 'pending_warehouse_review', 'delivery_address_snapshot' => $data['delivery_address_snapshot'],
+                'status' => 'pending_warehouse_review', 'delivery_address_snapshot' => $data['delivery_address_snapshot'] ?: ($pharmacy->address ?? 'Pharmacy address not recorded'),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $subtotal = 0;

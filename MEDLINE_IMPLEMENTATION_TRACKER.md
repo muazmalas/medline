@@ -1591,6 +1591,7 @@ Security/dependency scans
 - [x] Increased the content inset between the Orders hover bar and row text, and compacted pagination into a right-aligned group with the status filter kept at the group’s left edge. Tests/build intentionally not run per owner instruction.
 
 - [x] Added a visible Created date column to Orders and sortable headers for all operational data columns. Laravel validates server-side sort fields/direction; customer, pharmacy, driver, and medicine columns sort on the loaded page. Tests/build intentionally not run per owner instruction.
+- [x] Added a full Notifications workspace reachable from the bell popover, with search, read, delete, and refresh actions; order detail authorization now supports assigned pharmacy and driver users; procurement delivery addresses fall back to the authenticated pharmacy profile. Tests/build intentionally not run per owner instruction.
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
 - [ ] Multiple countries, currencies, and tax configurations.
