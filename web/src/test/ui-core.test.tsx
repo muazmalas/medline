@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../echo', () => ({ createMedlineEcho: () => ({ private: () => ({ listen: () => undefined }), disconnect: () => undefined }) }))
-import RootApp, { AdminSettingsPage, AdminTwoFactorPanel, api, ComplaintDetailPanel, ConsentSettings, Dashboard, DashboardAlerts, DeliveryDetailPanel, LiveDashboard, LoginPage, NotificationHealthPanel, notificationText, OperationsPage, OrderDetailPanel, PartnerAccessGuard, PartnerManagementPanel, PrescriptionReviewPanel, ProcurementCreatePanel, ProcurementDetailPanel, RatingQueue, SettingsPage, UserRolePanelWithCompany, WebNotifications } from '../App'
+import RootApp, { AdminSettingsPage, AdminTwoFactorPanel, api, ComplaintDetailPanel, ConsentSettings, Dashboard, DashboardAlerts, DeliveryDetailPanel, formatMedlineDate, formatMedlineMoney, LiveDashboard, LoginPage, NotificationHealthPanel, notificationText, OperationsPage, OrderDetailPanel, PartnerAccessGuard, PartnerManagementPanel, PrescriptionReviewPanel, ProcurementCreatePanel, ProcurementDetailPanel, RatingQueue, SettingsPage, UserRolePanelWithCompany, WebNotifications } from '../App'
 import { captureWebError } from '../telemetry'
 
 describe('MedLine UI core behavior', () => {
@@ -20,6 +20,8 @@ describe('MedLine UI core behavior', () => {
     expect(notificationText({ id: '5', type: 'system', data: null, read_at: null })).toBe('MedLine has a new update.')
     expect(notificationText({ id: '6', type: 'system', data: {}, read_at: null })).toBe('')
     expect(() => captureWebError(new Error('safe test error'), 'ui-test')).not.toThrow()
+    expect(formatMedlineDate('2026-08-19T17:49:02Z')).toContain('19 Aug 2026')
+    expect(formatMedlineMoney(2500)).toContain('SYP')
   })
 
   it('submits the login form and stores the access token', async () => {

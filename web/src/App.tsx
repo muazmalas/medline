@@ -11,6 +11,22 @@ import './style.css'
 type Row = { id: number; primary: string; secondary: string; status: string; raw: Record<string, unknown> }
 
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api/v1', withCredentials: true })
+
+export function formatMedlineDate(value: unknown, locale = 'en'): string {
+  if (!value) return '—'
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return String(value)
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : 'en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date)
+}
+
+export function formatMedlineMoney(value: unknown, currency = 'SYP', locale = 'en'): string {
+  const amount = Number(value ?? 0)
+  return new Intl.NumberFormat(locale === 'ar' ? 'ar' : 'en-GB', {
+    style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).format(Number.isFinite(amount) ? amount : 0)
+}
 let dashboardMetrics: Record<string, number> = {}
 const mutationConfig = (scope: string, id: number | string, action: string) => ({ headers: { 'Idempotency-Key': `web-${scope}-${id}-${action}` } })
 const uniqueMutationId = (scope: string) => typeof window.crypto?.randomUUID === 'function' ? `${scope}-${window.crypto.randomUUID()}` : `${scope}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -500,7 +516,7 @@ function LegacyOrderDetailPanel({ detail, onClose }: { detail: Record<string, un
 
 void LegacyOrderDetailPanel
 
-export function OrderDetailPanel({ detail, onClose, locale }: { detail: Record<string, unknown>; onClose: () => void; locale: string }) {
+function OrderDetailPanelRaw({ detail, onClose, locale }: { detail: Record<string, unknown>; onClose: () => void; locale: string }) {
   const order = (detail.order ?? {}) as Record<string, unknown>
   const invoice = (detail.invoice ?? {}) as Record<string, unknown>
   const timeline = Array.isArray(detail.timeline) ? detail.timeline as Array<Record<string, unknown>> : []
@@ -544,6 +560,16 @@ function LegacyDeliveryDetailPanel({ detail, onClose, locale }: { detail: Record
 }
 
 void LegacyDeliveryDetailPanel
+void OrderDetailPanelRaw
+
+export function OrderDetailPanel({ detail, onClose, locale }: { detail: Record<string, unknown>; onClose: () => void; locale: string }) {
+  const order = (detail.order ?? {}) as Record<string, unknown>
+  const invoice = (detail.invoice ?? {}) as Record<string, unknown>
+  const timeline = Array.isArray(detail.timeline) ? detail.timeline as Array<Record<string, unknown>> : []
+  const amount = (key: string) => formatMedlineMoney(invoice[key] ?? order[key] ?? 0, 'SYP', locale)
+  if (detail.error) return <section className="content"><button className="ghost-button" onClick={onClose}>Back to queue</button><div className="form-error">{String(detail.error)}</div></section>
+  return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{locale === 'ar' ? 'تفاصيل الطلب' : 'ORDER DETAIL'}</p><h1>{String(order.public_id ?? order.id ?? 'Order')}</h1><p className="muted">{String(order.status ?? 'unknown').replaceAll('_', ' ')} · {formatMedlineDate(order.created_at, locale)}</p></div><button className="ghost-button" onClick={onClose}>{locale === 'ar' ? 'العودة إلى القائمة' : 'Back to queue'}</button></div><div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{locale === 'ar' ? 'الفاتورة' : 'INVOICE'}</p><h2>{locale === 'ar' ? 'ملخص الطلب' : 'Order summary'}</h2></div></div><p>{locale === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}: {amount('subtotal')}</p><p>{locale === 'ar' ? 'رسوم التوصيل' : 'Delivery fee'}: {amount('delivery_fee')}</p><strong>{locale === 'ar' ? 'الإجمالي' : 'Total'}: {amount('total')}</strong><p className="muted">{locale === 'ar' ? 'الدفع' : 'Payment'}: {String(invoice.payment_method ?? order.payment_method ?? 'cash_on_delivery')}</p></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{locale === 'ar' ? 'الخط الزمني' : 'TIMELINE'}</p><h2>{locale === 'ar' ? 'تقدم التوصيل' : 'Delivery progress'}</h2></div></div>{timeline.length === 0 ? <div className="state">{locale === 'ar' ? 'لا توجد أحداث توصيل.' : 'No delivery events recorded yet.'}</div> : timeline.map((event, index) => <div className="activity-item" key={String(event.id ?? index)}><div className="activity-icon blue">{index + 1}</div><div><strong>{String(event.to_status ?? 'Updated').replaceAll('_', ' ')}</strong><span>{formatMedlineDate(event.created_at, locale)}</span></div></div>)}</section></div></section>
+}
 
 export function DeliveryDetailPanel({ detail, onClose, locale }: { detail: Record<string, unknown>; onClose: () => void; locale: string }) {
   const [currentDetail, setCurrentDetail] = useState(detail)
