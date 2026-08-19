@@ -31,4 +31,11 @@ class NotificationController extends Controller
         abort_unless($updated, 404);
         return response()->json(['message' => 'Notification marked as read.']);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $deleted = DB::table('notifications')->where('id', $id)->where('notifiable_type', 'App\\Models\\User')->where('notifiable_id', $request->user()->id)->delete();
+        abort_unless($deleted, 404);
+        return response()->json(['message' => 'Notification deleted.']);
+    }
 }

@@ -93,6 +93,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::put('/partner/inventory', [InventoryController::class, 'upsert'])->middleware('throttle:mutations');
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->middleware('throttle:mutations');
+        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->middleware('throttle:mutations');
         Route::get('/notification-preferences', [NotificationPreferenceController::class, 'show']);
         Route::patch('/notification-preferences', [NotificationPreferenceController::class, 'update'])->middleware('throttle:mutations');
         Route::get('/privacy/consents', [ConsentController::class, 'index']);

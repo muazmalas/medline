@@ -177,6 +177,7 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .rich-operations-panel .table-row { grid-template-columns: minmax(170px, 1.3fr) minmax(170px, 1.25fr) minmax(150px, 1.15fr) minmax(100px, .75fr) minmax(120px, .85fr) minmax(130px, .9fr); min-height: 72px; gap: 20px; }
 .rich-operations-panel:has(.table-head span:nth-child(7)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(150px, 1fr) minmax(160px, 1.1fr) minmax(105px, .75fr) minmax(120px, .85fr) minmax(130px, .9fr) minmax(115px, .8fr); }
 .rich-operations-panel:has(.table-head span:nth-child(9)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(140px, 1fr) minmax(150px, 1.05fr) minmax(120px, .9fr) minmax(170px, 1.25fr) minmax(180px, 1.35fr) minmax(105px, .8fr) minmax(130px, .9fr) minmax(100px, .7fr); }
+.rich-operations-panel:has(.table-head span:nth-child(10)) .table-row { grid-template-columns: minmax(160px, 1.1fr) minmax(135px, .95fr) minmax(145px, 1fr) minmax(115px, .85fr) minmax(165px, 1.2fr) minmax(175px, 1.3fr) minmax(105px, .8fr) minmax(135px, .95fr) minmax(130px, .9fr) minmax(82px, .65fr); }
 .content:has(> .panel.table-panel) > .panel.table-panel.rich-operations-panel .operations-table:has(.table-head span:nth-child(9)) .table-row { grid-template-columns: minmax(170px, 1.15fr) minmax(140px, 1fr) minmax(150px, 1.05fr) minmax(120px, .9fr) minmax(170px, 1.25fr) minmax(180px, 1.35fr) minmax(105px, .8fr) minmax(130px, .9fr) minmax(130px, .95fr); }
 .rich-operations-panel .row-actions { display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: nowrap; }
 .rich-operations-panel .row-actions button { white-space: nowrap; }
@@ -195,6 +196,16 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .content:has(.rich-operations-panel .table-head span:nth-child(9)) .table-row > .ghost-button::before { content: '↗'; color: #147fa8; font-size: 25px; font-weight: 900; }
 .content:has(.rich-operations-panel .table-head span:nth-child(9)) .table-row > .ghost-button::before { content: none; }
 .content:has(.rich-operations-panel .table-head span:nth-child(9)) .table-row > .ghost-button svg { display: block; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) { max-width: none; padding: 4px 18px 48px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) > .welcome-row { display: none; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) > .panel { padding-left: 18px; padding-right: 18px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) .operations-table .table-row { min-width: 1640px; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) .row-actions .approve-button, .content:has(.rich-operations-panel .table-head span:nth-child(10)) .row-actions .reject-button { width: 44px; height: 44px; padding: 0; border-radius: 10px; font-size: 0; display: inline-grid; place-items: center; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) .row-actions button svg, .content:has(.rich-operations-panel .table-head span:nth-child(10)) .table-row > .ghost-button svg { display: block; }
+.content:has(.rich-operations-panel .table-head span:nth-child(10)) .table-row > .ghost-button { width: 44px; height: 44px; padding: 0; justify-self: start; border: 1px solid #b9dce9; border-radius: 10px; background: #eef9fd; font-size: 0; display: inline-grid; place-items: center; }
+.sortable-header { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 0; background: transparent; color: #94a6b0; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; text-align: left; }
+.sortable-header:hover, .sortable-header.active { color: #147fa8; }
+.sortable-header.active { font-weight: 800; }
 .rich-operations-panel .table-head { min-height: 46px; }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
 .stock-health { display: inline-flex; justify-self: start; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
@@ -229,6 +240,15 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .table-pagination .ghost-button:disabled { cursor: not-allowed; opacity: .45; }
 .status-filter-label { display: inline-flex; align-items: center; gap: 9px; margin-right: 18px; color: #6f899b; font-size: 12px; font-weight: 700; }
 .status-filter-label select { min-width: 190px; padding: 9px 34px 9px 12px; border: 1px solid #cfe0e9; border-radius: 9px; background: #fff; color: #17384e; font-weight: 700; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) { display: flex; flex-direction: column; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) > .panel-heading { order: 1; margin-bottom: 14px; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) > .search-box { order: 2; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) > .table-pagination { order: 3; align-self: flex-end; margin: -58px 0 12px; padding: 0; border-top: 0; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) > .operations-table { order: 4; margin-top: 18px; }
+.rich-operations-panel:has(.table-head span:nth-child(10)) .panel-heading .eyebrow { display: none; }
+.status-filter-label select { appearance: auto; min-height: 38px; box-shadow: 0 2px 7px #17384e12; cursor: pointer; }
+.content > .panel:first-of-type .inline-form select { min-width: 190px; border: 1px solid #cfe0e9; border-radius: 9px; background: #fff; color: #17384e; padding: 10px 34px 10px 12px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 7px #17384e0d; }
+.content > .panel:first-of-type .inline-form input { min-width: 118px; }
 .inventory-subview-actions { display: flex; justify-content: flex-end; margin: 0 0 16px; }
 .content > .panel:first-of-type .inline-form { align-items: end; }
 .content > .panel:first-of-type .inline-form input, .content > .panel:first-of-type .inline-form select { min-height: 48px; }

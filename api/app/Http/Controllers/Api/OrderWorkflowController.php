@@ -24,6 +24,9 @@ class OrderWorkflowController extends Controller
             return response()->json(['message' => 'Partner profile not found.'], 404);
         }
 
+        $sortable = ['public_id', 'status', 'created_at', 'total', 'delivery_address_snapshot'];
+        $sortBy = in_array($request->string('sort_by')->toString(), $sortable, true) ? $request->string('sort_by')->toString() : 'created_at';
+        $sortDirection = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
         $orders = Order::with('items')
             ->where('pharmacy_id', $partner->id)
             ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
@@ -35,7 +38,7 @@ class OrderWorkflowController extends Controller
                 });
             })
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))
-            ->latest()
+            ->orderBy($sortBy, $sortDirection)
             ->paginate(min($request->integer('per_page', 20), 50));
         $orders->getCollection()->transform(function ($record) use ($partner) {
             $record->customer_name = DB::table('users')->where('id', $record->patient_id)->value('name');

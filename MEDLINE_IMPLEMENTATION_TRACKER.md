@@ -1590,6 +1590,7 @@ Security/dependency scans
 - [x] Corrected idempotent demo delivery scenarios so pre-review orders have no delivery, accepted/transit and completed orders have compatible delivery states, and cancelled orders use `cancelled`; stale pre-review demo deliveries are removed on reseed. Replaced CSS glyph actions with Lucide Eye, FileCheck2, and FileX2 icons with accessible labels/tooltips. Tests/build intentionally not run per owner instruction.
 - [x] Increased the content inset between the Orders hover bar and row text, and compacted pagination into a right-aligned group with the status filter kept at the group’s left edge. Tests/build intentionally not run per owner instruction.
 
+- [x] Added a visible Created date column to Orders and sortable headers for all operational data columns. Laravel validates server-side sort fields/direction; customer, pharmacy, driver, and medicine columns sort on the loaded page. Tests/build intentionally not run per owner instruction.
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
 - [ ] Multiple countries, currencies, and tax configurations.

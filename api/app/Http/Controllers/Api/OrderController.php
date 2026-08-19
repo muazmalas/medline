@@ -21,6 +21,9 @@ class OrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         abort_unless(in_array($request->user()->role, ['patient', 'admin'], true), 403);
+        $sortable = ['public_id', 'status', 'created_at', 'total', 'delivery_address_snapshot'];
+        $sortBy = in_array($request->string('sort_by')->toString(), $sortable, true) ? $request->string('sort_by')->toString() : 'created_at';
+        $sortDirection = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
         $orders = Order::query()
             ->with('items')
             ->when($request->user()->role === 'patient', fn ($query) => $query->where('patient_id', $request->user()->id))
@@ -33,7 +36,7 @@ class OrderController extends Controller
                 });
             })
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))
-            ->latest()
+            ->orderBy($sortBy, $sortDirection)
             ->paginate(min($request->integer('per_page', 15), 50));
         $orders->getCollection()->transform(function ($record) {
             $record->customer_name = DB::table('users')->where('id', $record->patient_id)->value('name');
@@ -49,7 +52,11 @@ class OrderController extends Controller
 
     public function show(Request $request, Order $order): JsonResponse
     {
-        abort_unless($request->user()->role === 'admin' || $order->patient_id === $request->user()->id, 403);
+        $user = $request->user();
+        $canView = $user->role === 'admin' || $order->patient_id === $user->id;
+        $canView = $canView || ($user->role === 'pharmacy' && $order->pharmacy_id === DB::table('partners')->where('user_id', $user->id)->value('id'));
+        $canView = $canView || ($user->role === 'driver' && DB::table('deliveries')->join('drivers', 'drivers.id', '=', 'deliveries.driver_id')->where('deliveries.order_id', $order->id)->where('drivers.user_id', $user->id)->exists());
+        abort_unless($canView, 403);
         $order->load('items');
         $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
