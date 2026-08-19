@@ -79,7 +79,7 @@ class SubscriptionController extends Controller
                 $partner = Partner::whereKey($partner->id)->lockForUpdate()->firstOrFail();
                 $pending = DB::table('subscriptions')->where('partner_id', $partner->id)->where('status', 'payment_under_review')->lockForUpdate()->exists();
                 abort_unless(! $pending, 409, 'A subscription payment proof is already awaiting review.');
-                $subscriptionId = DB::table('subscriptions')->insertGetId(['partner_id' => $partner->id, 'plan_code' => $planCode, 'status' => 'payment_under_review', 'amount' => $data['amount'], 'duration_months' => $plan['duration_months'], 'starts_at' => now()->toDateString(), 'ends_at' => now()->addMonths($plan['duration_months'])->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
+                $subscriptionId = DB::table('subscriptions')->insertGetId(['partner_id' => $partner->id, 'plan_code' => $planCode, 'origin' => 'renewal', 'status' => 'payment_under_review', 'amount' => $data['amount'], 'duration_months' => $plan['duration_months'], 'starts_at' => null, 'ends_at' => null, 'created_at' => now(), 'updated_at' => now()]);
                 DB::table('payment_proofs')->insert(['subscription_id' => $subscriptionId, 'submitted_by' => $request->user()->id, 'file_path' => $storedPath, 'status' => 'under_review', 'created_at' => now(), 'updated_at' => now()]);
                 $partner->update(['subscription_status' => 'inactive']);
                 return ['message' => 'Payment proof submitted for review.', 'subscription_id' => $subscriptionId];

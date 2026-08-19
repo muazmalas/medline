@@ -17,11 +17,13 @@ use Illuminate\Support\Facades\Crypt;
 use App\Support\AuditService;
 use App\Support\NotificationService;
 use App\Support\DatabaseTransaction;
+use App\Contracts\FileScanner;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class AuthController extends Controller
 {
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, FileScanner $scanner): JsonResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'min:2', 'max:120'],
@@ -34,13 +36,28 @@ class AuthController extends Controller
             'address' => ['required_if:role,pharmacy,warehouse', 'nullable', 'string', 'max:1000'],
             'latitude' => ['required_if:role,pharmacy,warehouse', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['required_if:role,pharmacy,warehouse', 'nullable', 'numeric', 'between:-180,180'],
+            'payment_amount' => ['required_if:role,pharmacy,warehouse', 'nullable', 'numeric', 'min:0'],
+            'payment_proof' => ['required_if:role,pharmacy,warehouse', 'nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
             'national_id' => ['required_if:role,driver', 'nullable', 'string', 'max:120', 'unique:drivers,national_id'],
             'vehicle_type' => ['required_if:role,driver', 'nullable', 'string', 'max:64'],
             'vehicle_plate' => ['required_if:role,driver', 'nullable', 'string', 'max:32'],
             'transport' => ['sometimes', 'in:bearer,cookie'],
         ]);
 
-        $user = DatabaseTransaction::run(function () use ($data, $request) {
+        $proofPath = null;
+        if (in_array($data['role'], ['pharmacy', 'warehouse'], true)) {
+            $planCode = 'annual_' . $data['role'];
+            $plan = config('medline.subscription_plans.' . $planCode);
+            abort_unless(is_array($plan), 422, 'The annual subscription plan is not configured.');
+            if ($plan['amount'] !== null) {
+                abort_unless(number_format((float) $data['payment_amount'], 2, '.', '') === number_format((float) $plan['amount'], 2, '.', ''), 422, 'The registration payment amount does not match the annual subscription plan.');
+            }
+            $scanner->scan($data['payment_proof']);
+            $proofPath = $data['payment_proof']->store('private/payment-proofs');
+        }
+
+        try {
+        $user = DatabaseTransaction::run(function () use ($data, $request, $proofPath) {
             $created = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -52,7 +69,7 @@ class AuthController extends Controller
             ]);
 
             if (in_array($created->role, ['pharmacy', 'warehouse'], true)) {
-                Partner::create([
+                $partner = Partner::create([
                     'user_id' => $created->id,
                     'type' => $created->role,
                     'business_name' => $data['business_name'],
@@ -61,6 +78,30 @@ class AuthController extends Controller
                     'address' => $data['address'] ?? null,
                     'latitude' => $data['latitude'] ?? null,
                     'longitude' => $data['longitude'] ?? null,
+                    'approval_status' => 'pending',
+                    'subscription_status' => 'inactive',
+                ]);
+                $planCode = 'annual_' . $created->role;
+                $plan = config('medline.subscription_plans.' . $planCode);
+                $subscriptionId = DB::table('subscriptions')->insertGetId([
+                    'partner_id' => $partner->id,
+                    'plan_code' => $planCode,
+                    'origin' => 'registration',
+                    'status' => 'payment_under_review',
+                    'amount' => $data['payment_amount'],
+                    'duration_months' => $plan['duration_months'],
+                    'starts_at' => null,
+                    'ends_at' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                DB::table('payment_proofs')->insert([
+                    'subscription_id' => $subscriptionId,
+                    'submitted_by' => $created->id,
+                    'file_path' => $proofPath,
+                    'status' => 'under_review',
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
             if ($created->role === 'driver') {
@@ -68,6 +109,10 @@ class AuthController extends Controller
             }
             return $created;
         });
+        } catch (Throwable $exception) {
+            if ($proofPath) Storage::delete($proofPath);
+            throw $exception;
+        }
         $this->sendVerification($user);
         if ($user->role !== 'patient') {
             User::where('role', 'admin')->pluck('id')->each(fn ($adminId) => NotificationService::send($adminId, 'registration.submitted', ['user_id' => $user->id, 'role' => $user->role, 'message' => 'A new partner or driver application requires review.']));

@@ -129,6 +129,17 @@ class AdminController extends Controller
     {
         abort_unless(request()->user()->role === 'admin', 403);
         $record = DB::table('partners')->leftJoin('users', 'users.id', '=', 'partners.user_id')->where('partners.id', $partner->id)->select('partners.*', 'users.name as contact_name', 'users.email as contact_email')->firstOrFail();
+        $subscription = DB::table('subscriptions')->where('partner_id', $partner->id)->latest('created_at')->first();
+        $proof = $subscription ? DB::table('payment_proofs')->where('subscription_id', $subscription->id)->latest('created_at')->first() : null;
+        $record->subscription_id = $subscription?->id;
+        $record->subscription_plan_code = $subscription?->plan_code;
+        $record->latest_subscription_status = $subscription?->status ?? 'not_submitted';
+        $record->subscription_amount = $subscription?->amount;
+        $record->subscription_starts_at = $subscription?->starts_at;
+        $record->subscription_ends_at = $subscription?->ends_at;
+        $record->payment_proof_id = $proof?->id;
+        $record->payment_proof_status = $proof?->status ?? 'not_submitted';
+        $record->payment_proof_review_note = $proof?->review_note;
         return response()->json(['partner' => $record]);
     }
 
@@ -187,6 +198,7 @@ class AdminController extends Controller
             ->join('partners', 'partners.id', '=', 'subscriptions.partner_id')
             ->leftJoin('payment_proofs', 'payment_proofs.subscription_id', '=', 'subscriptions.id')
             ->select('subscriptions.*', 'partners.business_name', 'partners.type', 'payment_proofs.id as payment_proof_id', 'payment_proofs.status as proof_status')
+            ->where('subscriptions.origin', 'renewal')
             ->when($request->string('search')->isNotEmpty(), fn ($query) => $query->where('partners.business_name', 'like', '%' . $request->string('search')->toString() . '%'))
             ->latest('subscriptions.created_at')
             ->paginate(min($request->integer('per_page', 30), 100));
@@ -297,6 +309,20 @@ class AdminController extends Controller
             $locked = Partner::whereKey($partner->id)->lockForUpdate()->firstOrFail();
             abort_unless(in_array($locked->approval_status, ['pending', 'correction_required'], true), 409, 'This partner application has already been finalized.');
             $locked->update(['approval_status' => $status, 'review_note' => $status === 'correction_required' ? ($data['note'] ?? null) : null]);
+            $initialSubscription = DB::table('subscriptions')->where('partner_id', $locked->id)->where('origin', 'registration')->latest('created_at')->lockForUpdate()->first();
+            $initialProof = $initialSubscription ? DB::table('payment_proofs')->where('subscription_id', $initialSubscription->id)->where('status', 'under_review')->lockForUpdate()->first() : null;
+            if ($status === 'approved') {
+                abort_unless($initialSubscription && $initialSubscription->status === 'payment_under_review' && $initialProof, 422, 'The registration payment proof must be reviewed before approving this pharmacy or warehouse.');
+                $startsAt = today();
+                $endsAt = today()->addMonths((int) $initialSubscription->duration_months);
+                DB::table('subscriptions')->where('id', $initialSubscription->id)->update(['status' => 'active', 'starts_at' => $startsAt, 'ends_at' => $endsAt, 'updated_at' => now()]);
+                DB::table('payment_proofs')->where('id', $initialProof->id)->update(['status' => 'approved', 'reviewed_by' => $request->user()->id, 'review_note' => $data['note'] ?? null, 'reviewed_at' => now(), 'updated_at' => now()]);
+                $locked->update(['subscription_status' => 'active']);
+            } else {
+                if ($initialSubscription) DB::table('subscriptions')->where('id', $initialSubscription->id)->update(['status' => 'rejected', 'updated_at' => now()]);
+                if ($initialProof) DB::table('payment_proofs')->where('id', $initialProof->id)->update(['status' => 'rejected', 'reviewed_by' => $request->user()->id, 'review_note' => $data['note'] ?? null, 'reviewed_at' => now(), 'updated_at' => now()]);
+                $locked->update(['subscription_status' => 'inactive']);
+            }
             return $locked->fresh();
         });
         $organization = ucfirst((string) $partner->type);
@@ -316,6 +342,7 @@ class AdminController extends Controller
         $status = $data['decision'] === 'approve' ? 'active' : 'rejected';
         DatabaseTransaction::run(function () use ($record, $status, $data, $request) {
             $lockedSubscription = DB::table('subscriptions')->where('id', $record->id)->lockForUpdate()->firstOrFail();
+            abort_unless(($lockedSubscription->origin ?? 'renewal') === 'renewal', 409, 'Initial registration payments are reviewed from the pharmacy or warehouse application.');
             abort_unless($lockedSubscription->status === 'payment_under_review', 409, 'This subscription payment has already been reviewed.');
             $proof = DB::table('payment_proofs')->where('subscription_id', $lockedSubscription->id)->where('status', 'under_review')->lockForUpdate()->first();
             abort_unless($proof, 409, 'No pending payment proof remains for this subscription.');
@@ -326,8 +353,8 @@ class AdminController extends Controller
             }
             DB::table('subscriptions')->where('id', $lockedSubscription->id)->update($subscriptionUpdate);
             DB::table('payment_proofs')->where('id', $proof->id)->update(['status' => $status, 'reviewed_by' => $request->user()->id, 'review_note' => $data['note'] ?? null, 'reviewed_at' => now(), 'updated_at' => now()]);
-            DB::table('partners')->where('id', $lockedSubscription->partner_id)->lockForUpdate()->firstOrFail();
-            DB::table('partners')->where('id', $lockedSubscription->partner_id)->update(['subscription_status' => $status === 'active' ? 'active' : 'inactive', 'updated_at' => now()]);
+            $partner = DB::table('partners')->where('id', $lockedSubscription->partner_id)->lockForUpdate()->firstOrFail();
+            DB::table('partners')->where('id', $lockedSubscription->partner_id)->update(['subscription_status' => $status === 'active' && $partner->approval_status === 'approved' ? 'active' : 'inactive', 'updated_at' => now()]);
         });
         $partnerUserId = DB::table('partners')->where('id', $record->partner_id)->value('user_id');
         if ($partnerUserId) NotificationService::send($partnerUserId, 'subscription.' . $data['decision'], ['subscription_id' => $record->id, 'status' => $status, 'message' => 'Your MedLine subscription payment review was updated.']);
