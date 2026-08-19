@@ -208,6 +208,24 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .sortable-header.active { font-weight: 800; }
 .rich-operations-panel .table-head { min-height: 46px; }
 .rich-operations-panel .sortable-header { white-space: nowrap; overflow: visible; }
+.patient-order-create { margin-bottom: 24px; }
+.customer-order-map-wrap { position: relative; margin: 18px 0 22px; }
+.customer-order-map { height: 390px; width: 100%; border: 1px solid #cfe1e9; border-radius: 16px; overflow: hidden; z-index: 0; }
+.customer-order-map .leaflet-control-attribution { font-size: 10px; }
+.map-instruction { position: absolute; left: 16px; bottom: 16px; z-index: 500; display: flex; align-items: center; gap: 9px; max-width: 440px; padding: 10px 14px; border: 1px solid #d9e8ee; border-radius: 10px; background: rgba(255,255,255,.94); color: #41677b; font-size: 13px; box-shadow: 0 6px 18px rgba(12,55,79,.12); }
+.map-instruction span, .order-step-number { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: #e5f5fb; color: #087da8; font-weight: 800; }
+.map-selection-card { position: absolute; top: 16px; left: 58px; z-index: 500; display: grid; gap: 3px; padding: 11px 14px; border-left: 4px solid #0b9d76; border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 7px 20px rgba(12,55,79,.14); }
+.map-selection-card strong { color: #0b3955; }
+.map-selection-card span { color: #6c8999; font-size: 12px; }
+.customer-order-form { display: grid; gap: 16px; }
+.order-step-card, .delivery-point-summary { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border: 1px solid #d6e6ed; border-radius: 12px; background: #f7fbfd; }
+.order-step-card div, .delivery-point-summary div { display: grid; gap: 3px; }
+.order-step-card small, .delivery-point-summary small { color: #6d8a9b; }
+.customer-order-fields { display: grid; grid-template-columns: 1.4fr 1.4fr .6fr; gap: 14px; }
+.customer-order-fields label { display: grid; gap: 7px; color: #456b7d; font-size: 13px; font-weight: 700; }
+.customer-order-fields input, .customer-order-fields select { width: 100%; min-height: 46px; padding: 0 13px; border: 1px solid #cfe1e9; border-radius: 10px; background: #fff; color: #123d58; }
+.delivery-point-summary.selected { border-color: #9fe3cc; background: #f0fbf7; }
+@media (max-width: 760px) { .customer-order-map { height: 310px; } .customer-order-fields { grid-template-columns: 1fr; } .map-instruction { right: 12px; left: 12px; bottom: 12px; } }
 .rich-operations-panel .money-cell { color: #117dab; font-weight: 800; }
 .stock-health { display: inline-flex; justify-self: start; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; }
 .stock-health.healthy { background: #e8f9f0; color: #21865d; }

@@ -818,35 +818,57 @@ export function RatingQueue({ locale }: { locale: string }) {
   return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{text('trustSafety')}</p><h1>{text('ratingsModeration')}</h1><p className="muted">{text('ratingsGuidance')}</p></div></div><section className="panel table-panel"><div className="panel-heading"><div><p className="eyebrow">{text('ratings')}</p><h2>{text('feedbackQueue')}</h2></div><span className="live-status" role="status"><i aria-hidden="true" /> {text('auditedActions')}</span></div><div className="search-box"><Search size={19} aria-hidden="true" /><input aria-label={text('searchFeedback')} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={text('searchFeedback')} /></div>{message && <div className="form-success" role="status">{message}</div>}<div className="operations-table"><div className="table-row table-head"><span>{text('order')}</span><span>{text('authorComment')}</span><span>{text('status')}</span><span>{text('action')}</span></div>{rows.length === 0 ? <div className="state" role="status">{text('noRatings')}</div> : rows.map((row) => <div className="table-row" key={String(row.id)}><strong>{String(row.public_id ?? `Rating ${row.id}`)}</strong><span>{String(row.creator_name ?? row.creator_email ?? 'User')} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {String(row.comment ?? 'No comment')} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {String(row.score ?? '?')}/5</span><span className="status-pill">{row.hidden_at ? text('hidden') : text('visible')}</span><div className="row-actions"><button type="button" className={row.hidden_at ? 'approve-button' : 'reject-button'} onClick={() => void moderate(Number(row.id), row.hidden_at ? 'restore' : 'hide')}>{row.hidden_at ? text('restore') : text('hide')}</button></div></div>)}</div></section></section>
 }
 
-function PatientOrderCreatePanel({ locale }: { locale: string }) {
+function CustomerOrderMap({ pharmacies, selectedPharmacy, deliveryPoint, onPharmacySelect, onDeliverySelect }: { pharmacies: Array<Record<string, unknown>>; selectedPharmacy: Record<string, unknown> | null; deliveryPoint: { latitude: number; longitude: number } | null; onPharmacySelect: (pharmacy: Record<string, unknown>) => void; onDeliverySelect: (latitude: number, longitude: number) => void }) {
+  const mapElement = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.LayerGroup | null>(null)
+  const deliveryMarkerRef = useRef<L.Marker | null>(null)
+  const center: L.LatLngExpression = [33.5138, 36.2765]
+  useEffect(() => {
+    if (!mapElement.current || mapRef.current) return
+    const map = L.map(mapElement.current, { zoomControl: true }).setView(center, 12)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map)
+    map.on('click', (event) => onDeliverySelect(event.latlng.lat, event.latlng.lng))
+    mapRef.current = map
+    return () => { map.remove(); mapRef.current = null }
+  }, [])
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    markersRef.current?.clearLayers()
+    const markers = L.layerGroup().addTo(map)
+    markersRef.current = markers
+    const validPoints = pharmacies.map((pharmacy) => ({ pharmacy, latitude: Number(pharmacy.latitude), longitude: Number(pharmacy.longitude) })).filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+    validPoints.forEach(({ pharmacy, latitude, longitude }) => {
+      const marker = L.marker([latitude, longitude]).addTo(markers)
+      marker.bindPopup(`<strong>${String(pharmacy.business_name ?? 'Pharmacy')}</strong><br>${String(pharmacy.address ?? 'Approved pharmacy')}`)
+      marker.on('click', () => onPharmacySelect(pharmacy))
+    })
+    if (validPoints.length > 0) map.fitBounds(L.latLngBounds(validPoints.map((point) => [point.latitude, point.longitude] as [number, number])), { padding: [30, 30], maxZoom: 14 })
+  }, [pharmacies, onPharmacySelect])
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !deliveryPoint) return
+    deliveryMarkerRef.current?.remove()
+    deliveryMarkerRef.current = L.marker([deliveryPoint.latitude, deliveryPoint.longitude], { title: 'Delivery address' }).addTo(map).bindPopup('<strong>Delivery address</strong>').openPopup()
+  }, [deliveryPoint])
+  return <div className="customer-order-map-wrap"><div ref={mapElement} className="customer-order-map" /><div className="map-instruction"><span>1</span> Select a pharmacy marker, then click anywhere on the map to pin your delivery address.</div>{selectedPharmacy && <div className="map-selection-card"><strong>{String(selectedPharmacy.business_name)}</strong><span>{String(selectedPharmacy.address ?? 'Approved pharmacy')}</span></div>}</div>
+}
+
+function PatientOrderCreatePanel({ locale: _locale }: { locale: string }) {
   const [pharmacies, setPharmacies] = useState<Array<Record<string, unknown>>>([])
   const [medicines, setMedicines] = useState<Array<Record<string, unknown>>>([])
+  const [selectedPharmacy, setSelectedPharmacy] = useState<Record<string, unknown> | null>(null)
+  const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [medicineSearch, setMedicineSearch] = useState('')
+  const [medicineId, setMedicineId] = useState('')
+  const [quantity, setQuantity] = useState('1')
   const [message, setMessage] = useState('')
-  useEffect(() => {
-    Promise.all([
-      api.get('/partners', { params: { type: 'pharmacy', per_page: 100 } }),
-      api.get('/medicines', { params: { available_only: true, per_page: 100 } }),
-    ]).then(([pharmacyResponse, medicineResponse]) => {
-      setPharmacies(pharmacyResponse.data.data ?? [])
-      setMedicines(medicineResponse.data.data ?? [])
-    }).catch(() => setMessage('Unable to load available pharmacies and medicines.'))
-  }, [])
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    try {
-      await api.post('/orders', {
-        pharmacy_id: Number(form.get('pharmacy_id')),
-        delivery_address_snapshot: String(form.get('delivery_address_snapshot') ?? ''),
-        items: [{ medicine_id: Number(form.get('medicine_id')), quantity: Number(form.get('quantity')) }],
-      }, mutationConfig('patient-order', uniqueMutationId('patient-order'), 'create'))
-      setMessage('Order submitted to the selected pharmacy for review.')
-      event.currentTarget.reset()
-    } catch (error) {
-      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to create order.' : 'Unable to create order.')
-    }
-  }
-  return <section className="panel patient-order-create"><div className="panel-heading"><div><p className="eyebrow">NEW ORDER</p><h2>Order from a pharmacy</h2><p className="muted">Choose an approved pharmacy, medicine, quantity, and delivery destination.</p></div></div><form className="inline-form" onSubmit={submit}><select name="pharmacy_id" required defaultValue=""><option value="">Choose pharmacy</option>{pharmacies.map((pharmacy) => <option key={String(pharmacy.id)} value={String(pharmacy.id)}>{String(pharmacy.business_name)}</option>)}</select><select name="medicine_id" required defaultValue=""><option value="">Choose medicine</option>{medicines.map((medicine) => <option key={String(medicine.id)} value={String(medicine.id)}>{String(medicine.name_en)}</option>)}</select><input name="quantity" type="number" min="1" max="100" placeholder="Quantity" required /><input name="delivery_address_snapshot" placeholder="Delivery address" required /><button className="primary-button" type="submit">Create order</button></form>{message && <div className="form-message">{message}</div>}</section>
+  useEffect(() => { api.get('/partners', { params: { type: 'pharmacy', per_page: 100 } }).then((response) => setPharmacies(response.data.data ?? [])).catch(() => setMessage('Unable to load approved pharmacies.')) }, [])
+  const selectPharmacy = (pharmacy: Record<string, unknown>) => { setSelectedPharmacy(pharmacy); setMedicineId(''); setMedicines([]); api.get('/medicines', { params: { available_only: true, partner_id: Number(pharmacy.id), per_page: 100 } }).then((response) => setMedicines(response.data.data ?? [])).catch(() => setMessage('Unable to load medicines for this pharmacy.')) }
+  const filteredMedicines = medicines.filter((medicine) => `${String(medicine.name_en ?? '')} ${String(medicine.manufacturer ?? '')}`.toLowerCase().includes(medicineSearch.toLowerCase()))
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!selectedPharmacy || !medicineId || !deliveryPoint) { setMessage('Select a pharmacy, medicine, and delivery point on the map first.'); return } try { await api.post('/orders', { pharmacy_id: Number(selectedPharmacy.id), delivery_address_snapshot: `Pinned map location (${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)})`, items: [{ medicine_id: Number(medicineId), quantity: Number(quantity) }] }, mutationConfig('patient-order', uniqueMutationId('patient-order'), 'create')); setMessage('Order submitted to the selected pharmacy for review.'); setMedicineId(''); setQuantity('1') } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to create order.' : 'Unable to create order.') } }
+  return <section className="panel patient-order-create"><div className="panel-heading"><div><p className="eyebrow">NEW ORDER · MAP PICKER</p><h2>Choose a pharmacy and delivery location</h2><p className="muted">Click a pharmacy marker to view its available medicines. Then click the map to set where you want your order delivered.</p></div></div><CustomerOrderMap pharmacies={pharmacies} selectedPharmacy={selectedPharmacy} deliveryPoint={deliveryPoint} onPharmacySelect={selectPharmacy} onDeliverySelect={(latitude, longitude) => setDeliveryPoint({ latitude, longitude })} /><form className="customer-order-form" onSubmit={submit}><div className="order-step-card"><span className="order-step-number">2</span><div><strong>{selectedPharmacy ? String(selectedPharmacy.business_name) : 'Select a pharmacy on the map'}</strong><small>{selectedPharmacy ? 'Pharmacy selected · medicines are ready to choose' : 'Click a marker to continue'}</small></div></div><div className="customer-order-fields">{selectedPharmacy && <label>Search medicines<input value={medicineSearch} onChange={(event) => setMedicineSearch(event.target.value)} placeholder="Search by medicine name..." /></label>}<label>Medicine<select value={medicineId} onChange={(event) => setMedicineId(event.target.value)} required disabled={!selectedPharmacy}><option value="">{selectedPharmacy ? (filteredMedicines.length ? 'Choose available medicine' : 'No medicines match') : 'Select a pharmacy first'}</option>{filteredMedicines.map((medicine) => <option key={String(medicine.id)} value={String(medicine.id)}>{String(medicine.name_en)}{medicine.manufacturer ? ` · ${String(medicine.manufacturer)}` : ''}</option>)}</select></label><label>Quantity<input type="number" min="1" max="100" value={quantity} onChange={(event) => setQuantity(event.target.value)} required disabled={!selectedPharmacy} /></label></div><div className={`delivery-point-summary ${deliveryPoint ? 'selected' : ''}`}><span className="order-step-number">3</span><div><strong>{deliveryPoint ? 'Delivery location selected' : 'Pin your delivery location'}</strong><small>{deliveryPoint ? `${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)}` : 'Click the map where you want the driver to deliver'}</small></div></div><button className="primary-button" type="submit" disabled={!selectedPharmacy || !medicineId || !deliveryPoint}>Create order</button>{message && <div className="form-message">{message}</div>}</form></section>
 }
 
 export function OperationsPage({ section, role, locale }: { section: string; role: string; locale: string }) {
