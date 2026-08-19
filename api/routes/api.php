@@ -99,6 +99,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::patch('/driver/availability', [DriverController::class, 'updateAvailability'])->middleware('throttle:mutations');
         Route::get('/subscription', [SubscriptionController::class, 'current']);
         Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+        Route::patch('/subscription/profile', [SubscriptionController::class, 'updateProfile'])->middleware('throttle:mutations');
         Route::post('/subscription/payment-proof', [SubscriptionController::class, 'submitProof'])->middleware('throttle:uploads');
         Route::get('/admin/payment-proofs/{proof}/download', [SubscriptionController::class, 'downloadProof']);
         Route::get('/admin/payment-proofs/{proof}/download-url', [SubscriptionController::class, 'downloadProofUrl']);

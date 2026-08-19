@@ -11,7 +11,7 @@ class Partner extends Model
 
     protected $fillable = [
         'user_id', 'type', 'business_name', 'license_number', 'phone', 'address',
-        'latitude', 'longitude', 'approval_status', 'subscription_status',
+        'latitude', 'longitude', 'approval_status', 'review_note', 'subscription_status',
     ];
 
     protected function casts(): array

@@ -293,13 +293,17 @@ class AdminController extends Controller
         abort_unless($request->user()->role === 'admin', 403);
         $data = $request->validate(['decision' => ['required', 'in:approve,reject,correction'], 'note' => ['nullable', 'string', 'max:1000']]);
         $status = match ($data['decision']) { 'approve' => 'approved', 'reject' => 'rejected', default => 'correction_required' };
-        $partner = DatabaseTransaction::run(function () use ($partner, $status) {
+        $partner = DatabaseTransaction::run(function () use ($partner, $status, $data) {
             $locked = Partner::whereKey($partner->id)->lockForUpdate()->firstOrFail();
             abort_unless(in_array($locked->approval_status, ['pending', 'correction_required'], true), 409, 'This partner application has already been finalized.');
-            $locked->update(['approval_status' => $status]);
+            $locked->update(['approval_status' => $status, 'review_note' => $status === 'correction_required' ? ($data['note'] ?? null) : null]);
             return $locked->fresh();
         });
-        NotificationService::send($partner->user_id, 'registration.' . $data['decision'], ['partner_id' => $partner->id, 'status' => $status, 'message' => 'Your MedLine partner application was updated.']);
+        $organization = ucfirst((string) $partner->type);
+        $message = $data['decision'] === 'correction'
+            ? $organization . ' application needs correction. Admin note: ' . ($data['note'] ?? 'Please review the application details and resubmit.')
+            : $organization . ' application was ' . ($data['decision'] === 'approve' ? 'approved.' : 'rejected.');
+        NotificationService::send($partner->user_id, 'registration.' . $data['decision'], ['partner_id' => $partner->id, 'status' => $status, 'note' => $data['note'] ?? null, 'message' => $message]);
         AuditService::record($request, 'partner.' . $data['decision'], Partner::class, $partner->id, ['note' => $data['note'] ?? null]);
         return response()->json(['message' => 'Partner decision saved.', 'partner' => $partner]);
     }

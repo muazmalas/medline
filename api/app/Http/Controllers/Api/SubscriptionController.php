@@ -31,6 +31,22 @@ class SubscriptionController extends Controller
         return response()->json(['data' => $plans]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $partner = Partner::where('user_id', $request->user()->id)->firstOrFail();
+        $data = $request->validate([
+            'business_name' => ['required', 'string', 'max:180'],
+            'license_number' => ['required', 'string', 'max:120', 'unique:partners,license_number,' . $partner->id],
+            'address' => ['required', 'string', 'max:1000'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        $partner->update([...$data, 'approval_status' => 'pending', 'review_note' => null]);
+        User::where('role', 'admin')->pluck('id')->each(fn ($adminId) => NotificationService::send($adminId, 'registration.resubmitted', ['partner_id' => $partner->id, 'status' => 'pending', 'message' => 'A corrected ' . $partner->type . ' application was resubmitted for review.']));
+        AuditService::record($request, 'partner.resubmitted', Partner::class, $partner->id);
+        return response()->json(['message' => 'Your corrected application was resubmitted for review.', 'partner' => $partner->fresh()]);
+    }
+
     public function submitProof(Request $request, FileScanner $scanner): JsonResponse
     {
         $partner = Partner::where('user_id', $request->user()->id)->firstOrFail();
