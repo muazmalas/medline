@@ -32,6 +32,7 @@ class OrderController extends Controller
                         ->orWhere('delivery_address_snapshot', 'like', $like);
                 });
             })
+            ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->latest()
             ->paginate(min($request->integer('per_page', 15), 50));
         $orders->getCollection()->transform(function ($record) {
