@@ -218,6 +218,8 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .driver-trip-clickable { cursor: pointer; transition: background .18s ease, box-shadow .18s ease; }
 .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 22px; padding: 16px 4px 0; border-top: 1px solid #e5edf2; color: #6f899b; font-size: 13px; }
 .table-pagination .ghost-button:disabled { cursor: not-allowed; opacity: .45; }
+.status-filter-label { display: inline-flex; align-items: center; gap: 9px; margin-right: auto; color: #6f899b; font-size: 12px; font-weight: 700; }
+.status-filter-label select { min-width: 190px; padding: 9px 34px 9px 12px; border: 1px solid #cfe0e9; border-radius: 9px; background: #fff; color: #17384e; font-weight: 700; }
 .inventory-subview-actions { display: flex; justify-content: flex-end; margin: 0 0 16px; }
 .content > .panel:first-of-type .inline-form { align-items: end; }
 .content > .panel:first-of-type .inline-form input, .content > .panel:first-of-type .inline-form select { min-height: 48px; }

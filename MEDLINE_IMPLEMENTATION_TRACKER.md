@@ -1585,6 +1585,7 @@ Security/dependency scans
 - [x] Corrected the Orders rich-table grid so all columns stay on one aligned row, increased the Action column width, and kept Accept/Reject controls grouped separately inside the action cell; order projections now expose the related prescription ID for inline review workflows. Tests/build intentionally not run per owner instruction.
 - [x] Applied the full order-status bubble treatment to order queue statuses, converted status text to readable labels, and made rich operational tables horizontally scrollable with stable minimum widths to prevent column wrapping. Tests/build intentionally not run per owner instruction.
 - [x] Simplified the Orders workspace to show only the Orders overview heading, removed the duplicated page title, and expanded the order table to full available width with 5px horizontal workspace padding. Tests/build intentionally not run per owner instruction.
+- [x] Added a visible Orders status filter with Laravel-backed exact status filtering for pending pharmacy review, prescription review, accepted, in-transit, completed, and cancelled orders; the filter is integrated with the existing table pagination controls. Tests/build intentionally not run per owner instruction.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
