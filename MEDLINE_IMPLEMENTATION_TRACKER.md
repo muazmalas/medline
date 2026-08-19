@@ -1573,6 +1573,7 @@ Security/dependency scans
 - [x] Added prominent semantic order-status highlighting with status-specific colors and converted payment methods into readable icon pills without underscores. Tests/build intentionally not run per owner instruction.
 - [x] Adjusted OpenStreetMap route viewport fitting with larger bounds padding and a maximum zoom so the complete road path and both endpoint markers remain visible. Tests/build intentionally not run per owner instruction.
 - [x] Refined the timeline duration metric into a dedicated responsive summary card, preventing collisions with the delivery status badge on narrow layouts. Tests/build intentionally not run per owner instruction.
+- [x] Enlarged and polished timeline status badges to match the primary order-status treatment, including stronger contrast, semantic colors, inset highlight, and gloss accent. Tests/build intentionally not run per owner instruction.
 - [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
