@@ -6,6 +6,7 @@ mobile/.dart_tool/
 mobile/build/
 web/node_modules/
 web/dist/
+web/coverage/
 api/vendor/
 api/storage/app/private/
 api/storage/app/public/
