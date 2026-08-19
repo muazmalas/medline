@@ -1,0 +1,156 @@
+<?php
+
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MedicineController;
+use App\Http\Controllers\Api\MedicineCategoryController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\OrderWorkflowController;
+use App\Http\Controllers\Api\PartnerController;
+use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\NotificationPreferenceController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\DeliveryController;
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\ComplaintController;
+use App\Http\Controllers\Api\ProcurementController;
+use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\RatingController;
+use App\Http\Controllers\Api\AddressController;
+use App\Http\Controllers\Api\VerificationDocumentController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\ConsentController;
+use App\Http\Controllers\Api\DriverController;
+use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\DashboardController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware('throttle:api')->prefix('v1')->group(function () {
+    Route::get('/health', fn () => response()->json([
+        'status' => 'ok',
+        'service' => 'medline-api',
+        'timestamp' => now()->toIso8601String(),
+    ]));
+    Route::get('/health/ready', [HealthController::class, 'ready']);
+
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:auth');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth');
+    Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth');
+    Route::get('/medicines', [MedicineController::class, 'index']);
+    Route::get('/medicines/suggestions', [MedicineController::class, 'suggestions']);
+    Route::get('/medicine-categories', [MedicineCategoryController::class, 'index']);
+    Route::get('/partners', [PartnerController::class, 'index']);
+    Route::get('/partners/{partner}', [PartnerController::class, 'show']);
+
+    Route::middleware(['auth:sanctum', 'idempotency'])->group(function () {
+        Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('throttle:mutations');
+        Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('throttle:auth');
+        Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:auth');
+        Route::post('/auth/2fa/setup', [AuthController::class, 'twoFactorSetup'])->middleware('throttle:auth');
+        Route::get('/auth/2fa/status', [AuthController::class, 'twoFactorStatus']);
+        Route::post('/auth/2fa/confirm', [AuthController::class, 'twoFactorConfirm'])->middleware('throttle:auth');
+        Route::post('/auth/2fa/disable', [AuthController::class, 'twoFactorDisable'])->middleware('throttle:auth');
+        Route::post('/devices/tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:mutations');
+        Route::delete('/devices/tokens', [DeviceTokenController::class, 'destroy'])->middleware('throttle:mutations');
+        Route::get('/user', fn (Request $request) => $request->user());
+        Route::get('/addresses', [AddressController::class, 'index']);
+        Route::post('/addresses', [AddressController::class, 'store'])->middleware('throttle:mutations');
+        Route::patch('/addresses/{address}', [AddressController::class, 'update'])->middleware('throttle:mutations');
+        Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->middleware('throttle:mutations');
+        Route::post('/medicines', [MedicineController::class, 'store'])->middleware('throttle:uploads');
+        Route::post('/medicine-categories', [MedicineCategoryController::class, 'store'])->middleware('throttle:mutations');
+        Route::patch('/medicine-categories/{category}', [MedicineCategoryController::class, 'update'])->middleware('throttle:mutations');
+        Route::post('/medicines/import', [MedicineController::class, 'import'])->middleware('throttle:uploads');
+        Route::get('/medicines/export', [MedicineController::class, 'export']);
+        Route::patch('/medicines/{medicine}', [MedicineController::class, 'update'])->middleware('throttle:uploads');
+        Route::delete('/medicines/{medicine}', [MedicineController::class, 'destroy'])->middleware('throttle:mutations');
+        Route::get('/verification-documents', [VerificationDocumentController::class, 'mine']);
+        Route::post('/verification-documents', [VerificationDocumentController::class, 'store'])->middleware('throttle:uploads');
+        Route::get('/verification-documents/{document}/download', [VerificationDocumentController::class, 'download']);
+        Route::get('/verification-documents/{document}/download-url', [VerificationDocumentController::class, 'downloadUrl']);
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::get('/orders/{order}', [OrderController::class, 'show']);
+        Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:mutations');
+        Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('throttle:mutations');
+        Route::get('/cart', [CartController::class, 'show']);
+        Route::put('/cart/items', [CartController::class, 'update'])->middleware('throttle:mutations');
+        Route::delete('/cart', [CartController::class, 'clear'])->middleware('throttle:mutations');
+        Route::post('/orders/{order}/prescription', [PrescriptionController::class, 'store'])->middleware('throttle:uploads');
+        Route::get('/pharmacy/prescriptions', [PrescriptionController::class, 'pharmacyIndex']);
+        Route::get('/procurement', [ProcurementController::class, 'index']);
+        Route::get('/procurement/{procurement}', [ProcurementController::class, 'show']);
+        Route::post('/procurement', [ProcurementController::class, 'store'])->middleware('throttle:mutations');
+        Route::post('/procurement/{procurement}/decision', [ProcurementController::class, 'decide'])->middleware('throttle:mutations');
+        Route::get('/partner/orders', [OrderWorkflowController::class, 'partnerOrders']);
+        Route::post('/partner/orders/{order}/decision', [OrderWorkflowController::class, 'decide'])->middleware('throttle:mutations');
+        Route::get('/partner/inventory', [InventoryController::class, 'index']);
+        Route::put('/partner/inventory', [InventoryController::class, 'upsert'])->middleware('throttle:mutations');
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->middleware('throttle:mutations');
+        Route::get('/notification-preferences', [NotificationPreferenceController::class, 'show']);
+        Route::patch('/notification-preferences', [NotificationPreferenceController::class, 'update'])->middleware('throttle:mutations');
+        Route::get('/privacy/consents', [ConsentController::class, 'index']);
+        Route::post('/privacy/consents', [ConsentController::class, 'store'])->middleware('throttle:mutations');
+        Route::delete('/privacy/consents/{consentType}', [ConsentController::class, 'revoke'])->middleware('throttle:mutations');
+        Route::get('/driver/availability', [DriverController::class, 'availability']);
+        Route::patch('/driver/availability', [DriverController::class, 'updateAvailability'])->middleware('throttle:mutations');
+        Route::get('/subscription', [SubscriptionController::class, 'current']);
+        Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+        Route::post('/subscription/payment-proof', [SubscriptionController::class, 'submitProof'])->middleware('throttle:uploads');
+        Route::get('/admin/payment-proofs/{proof}/download', [SubscriptionController::class, 'downloadProof']);
+        Route::get('/admin/payment-proofs/{proof}/download-url', [SubscriptionController::class, 'downloadProofUrl']);
+        Route::get('/deliveries/available', [DeliveryController::class, 'available']);
+        Route::get('/deliveries/mine', [DeliveryController::class, 'mine']);
+        Route::get('/deliveries/{delivery}', [DeliveryController::class, 'show']);
+        Route::get('/partner/deliveries', [DeliveryController::class, 'partnerMine']);
+        Route::post('/deliveries/{delivery}/claim', [DeliveryController::class, 'claim'])->middleware('throttle:mutations');
+        Route::post('/deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->middleware('throttle:mutations');
+        Route::post('/deliveries/{delivery}/location', [DeliveryController::class, 'updateLocation'])->middleware('throttle:location');
+        Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->middleware('throttle:mutations');
+        Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
+        Route::get('/admin/notification-delivery-health', [AdminController::class, 'notificationDeliveryHealth']);
+        Route::get('/dashboard', [DashboardController::class, 'show']);
+        Route::get('/admin/users', [AdminController::class, 'users']);
+        Route::patch('/admin/users/{user}/status', [AdminController::class, 'updateUserStatus'])->middleware('throttle:mutations');
+        Route::patch('/admin/users/{user}/role', [AdminController::class, 'updateUserRole'])->middleware('throttle:mutations');
+        Route::get('/admin/verification-documents', [VerificationDocumentController::class, 'adminIndex']);
+        Route::post('/admin/verification-documents/{document}/decision', [VerificationDocumentController::class, 'decide'])->middleware('throttle:mutations');
+        Route::get('/admin/partners', [AdminController::class, 'partners']);
+        Route::get('/admin/deliveries', [AdminController::class, 'deliveries']);
+        Route::get('/admin/subscriptions', [AdminController::class, 'subscriptions']);
+        Route::get('/admin/complaints', [AdminController::class, 'complaints']);
+        Route::get('/admin/ratings', [AdminController::class, 'ratings']);
+        Route::post('/admin/ratings/{rating}/moderate', [AdminController::class, 'moderateRating'])->middleware('throttle:mutations');
+        Route::get('/admin/reports/complaints', [AdminController::class, 'complaintReport']);
+        Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
+        Route::get('/admin/audit-logs/export', [AdminController::class, 'auditExport']);
+        Route::post('/admin/partners/{partner}/decision', [AdminController::class, 'decidePartner'])->middleware('throttle:mutations');
+        Route::post('/admin/subscriptions/{subscription}/decision', [AdminController::class, 'decidePayment'])->middleware('throttle:mutations');
+        Route::post('/admin/deliveries/{delivery}/reassign', [AdminController::class, 'reassignDelivery'])->middleware('throttle:mutations');
+        Route::get('/prescriptions/{prescription}/download', [PrescriptionController::class, 'download']);
+        Route::get('/prescriptions/{prescription}/download-url', [PrescriptionController::class, 'downloadUrl']);
+        Route::post('/pharmacy/prescriptions/{prescription}/review', [PrescriptionController::class, 'review'])->middleware('throttle:mutations');
+        Route::get('/complaints', [ComplaintController::class, 'index']);
+        Route::get('/complaints/{complaint}', [ComplaintController::class, 'show']);
+        Route::post('/complaints', [ComplaintController::class, 'store'])->middleware('throttle:uploads');
+        Route::patch('/complaints/{complaint}', [ComplaintController::class, 'update'])->middleware('throttle:mutations');
+        Route::get('/complaints/{complaint}/attachments/{attachment}/download', [ComplaintController::class, 'download']);
+        Route::get('/complaints/{complaint}/attachments/{attachment}/download-url', [ComplaintController::class, 'downloadUrl']);
+        Route::post('/orders/{order}/rating', [RatingController::class, 'store'])->middleware('throttle:mutations');
+    });
+});
+
+// Signed file URLs are intentionally outside bearer authentication. Authorization is
+// performed when the short-lived URL is issued, then enforced by the signature and expiry.
+Route::middleware(['throttle:api', 'signed'])->prefix('v1')->group(function () {
+    Route::get('/verification-documents/{document}/download-signed', [VerificationDocumentController::class, 'downloadSigned'])->name('api.v1.verification-document.download-signed');
+    Route::get('/admin/payment-proofs/{proof}/download-signed', [SubscriptionController::class, 'downloadProofSigned'])->name('api.v1.payment-proof.download-signed');
+    Route::get('/prescriptions/{prescription}/download-signed', [PrescriptionController::class, 'downloadSigned'])->name('api.v1.prescription.download-signed');
+    Route::get('/complaints/{complaint}/attachments/{attachment}/download-signed', [ComplaintController::class, 'downloadSigned'])->name('api.v1.complaint-attachment.download-signed');
+});

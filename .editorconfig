@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{php,js,jsx,ts,tsx,dart,json,yaml,yml,md,ps1}]
+indent_style = space
+indent_size = 2
+
+[*.php]
+indent_size = 4
+
+[*.dart]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
