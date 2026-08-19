@@ -29,13 +29,15 @@ class ProcurementController extends Controller
     public function index(Request $request): JsonResponse
     {
         $partner = Partner::where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('subscription_status', 'active')->firstOrFail();
-        $query = DB::table('procurement_orders')->where(function ($q) use ($partner) { $q->where('pharmacy_id', $partner->id)->orWhere('warehouse_id', $partner->id); });
+        $query = DB::table('procurement_orders')->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')->where(function ($q) use ($partner) { $q->where('procurement_orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.warehouse_id', $partner->id); })->select('procurement_orders.*', 'pharmacies.business_name as pharmacy_name', 'warehouses.business_name as warehouse_name');
         if ($request->string('search')->isNotEmpty()) {
             $like = '%' . $request->string('search')->toString() . '%';
             $query->where(function ($nested) use ($like) {
-                $nested->where('public_id', 'like', $like)
-                    ->orWhere('status', 'like', $like)
-                    ->orWhere('delivery_address_snapshot', 'like', $like);
+                $nested->where('procurement_orders.public_id', 'like', $like)
+                    ->orWhere('procurement_orders.status', 'like', $like)
+                    ->orWhere('procurement_orders.delivery_address_snapshot', 'like', $like)
+                    ->orWhere('pharmacies.business_name', 'like', $like)
+                    ->orWhere('warehouses.business_name', 'like', $like);
             });
         }
         return response()->json($query->latest()->paginate(20));
