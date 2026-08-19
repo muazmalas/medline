@@ -1569,6 +1569,7 @@ Security/dependency scans
 - [x] Added order route mapping with pickup and drop-off coordinates, visual route line, location labels, legend, OpenStreetMap directions link, coordinate fallback state, and demo pharmacy coordinates for committee scenarios. Tests/build intentionally not run per owner instruction.
 - [x] Aligned delivery detail with order detail UX: added driver card, assignment/invoice hierarchy, pickup/drop-off route map, live-location panel, and stepwise delivery timeline for active and terminal deliveries. Tests/build intentionally not run per owner instruction.
 - [x] Added administrator pharmacy/warehouse detail views with business, license, contact, subscription, address, and OpenStreetMap location details; directory rows now provide a View details action. Tests/build intentionally not run per owner instruction.
+- [x] Replaced the decorative route illustration with a full-width OpenStreetMap/Leaflet route iframe and fixed responsive iframe sizing so map tiles fill the route container. Added total delivery duration formatting (`Xm` below one hour, `Hh Mm` otherwise). Tests/build intentionally not run per owner instruction.
 - [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
