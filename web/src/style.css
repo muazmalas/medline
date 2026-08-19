@@ -93,6 +93,11 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .driver-details span { color: #a9d0df; font-size: 10px; text-transform: uppercase; letter-spacing: .7px; }
 .driver-details strong { margin-top: 6px; color: #fff; font-size: 12px; overflow-wrap: anywhere; }
 .timeline-card { grid-column: 1 / -1; }
+.timeline-heading-right { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.timeline-summary { min-width: 132px; padding: 9px 13px; border: 1px solid #d8e8ee; border-radius: 11px; background: #f7fbfc; text-align: right; }
+.timeline-summary span, .timeline-summary strong { display: block; }
+.timeline-summary span { color: #7892a1; font: 700 9px Manrope; letter-spacing: .65px; text-transform: uppercase; white-space: nowrap; }
+.timeline-summary strong { margin-top: 4px; color: #117dab; font: 800 19px Manrope; line-height: 1; white-space: nowrap; }
 .route-card { grid-column: 1 / -1; }
 .live-location-card { grid-column: 1 / -1; }
 .route-card .panel-heading { align-items: center; }
@@ -160,6 +165,8 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
   .partner-detail-fields { grid-template-columns: 1fr; }
   .order-detail-grid .panel { padding: 20px; }
   .timeline-card { grid-column: auto; }
+  .timeline-heading-right { width: 100%; justify-content: space-between; }
+  .timeline-summary { flex: 1; text-align: left; }
   .route-card { grid-column: auto; }
   .live-location-card { grid-column: auto; }
   .route-map { min-height: 390px; }

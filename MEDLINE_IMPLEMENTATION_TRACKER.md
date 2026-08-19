@@ -1572,6 +1572,7 @@ Security/dependency scans
 - [x] Replaced the decorative route illustration with a full-width OpenStreetMap/Leaflet route iframe and fixed responsive iframe sizing so map tiles fill the route container. Added total delivery duration formatting (`Xm` below one hour, `Hh Mm` otherwise). Tests/build intentionally not run per owner instruction.
 - [x] Added prominent semantic order-status highlighting with status-specific colors and converted payment methods into readable icon pills without underscores. Tests/build intentionally not run per owner instruction.
 - [x] Adjusted OpenStreetMap route viewport fitting with larger bounds padding and a maximum zoom so the complete road path and both endpoint markers remain visible. Tests/build intentionally not run per owner instruction.
+- [x] Refined the timeline duration metric into a dedicated responsive summary card, preventing collisions with the delivery status badge on narrow layouts. Tests/build intentionally not run per owner instruction.
 - [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
