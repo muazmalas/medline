@@ -46,3 +46,26 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 @media (pointer: coarse) { :where(button, a, select, input[type='checkbox'], input[type='file']) { min-height: 44px; }.icon-button { min-width: 44px; }.row-actions { flex-wrap: wrap; }.row-actions > button { min-height: 44px; } }
 @media (prefers-contrast: more) { :root { color: #071d2b; }.panel, .metric-card, .notification-popover { border-color: #66808e; }.muted, .state, .breadcrumb, .activity-item span { color: #496675; }.status-pill, .live-status { border: 1px solid currentColor; } }
 .delivery-map { display: block; width: 100%; min-height: 220px; margin: 14px 0; border: 1px solid #dce7ed; border-radius: 10px; background: #eef5f7; }
+
+/* Operational queue tables use the full workspace for faster scanning. */
+.content:has(> .panel.table-panel) { max-width: none; width: 100%; margin: 0; padding: 42px 56px 72px; }
+.content:has(> .panel.table-panel) > .panel.table-panel { width: 100%; margin: 0; padding: 34px 38px 42px; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.content:has(> .panel.table-panel) > .panel.table-panel .panel-heading { margin-bottom: 26px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .panel-heading h2 { font-size: 24px; letter-spacing: -.7px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .search-box { height: 58px; padding: 0 18px; border-radius: 10px; background: #fff; font-size: 15px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .search-box input { font-size: 15px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .operations-table { margin-top: 28px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .table-row { grid-template-columns: minmax(220px, 1.4fr) minmax(260px, 1.8fr) minmax(150px, .9fr) minmax(100px, .55fr); min-height: 74px; padding: 14px 4px; gap: 28px; font-size: 14px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .table-row strong { font-size: 15px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .table-head { min-height: 46px; padding-top: 0; font-size: 11px; letter-spacing: .9px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .status-pill { padding: 7px 12px; font-size: 11px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .ghost-button { font-size: 14px; }
+.content:has(> .panel.table-panel) > .panel.table-panel .operations-table:has(.table-head span:nth-child(5)) .table-row { grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.5fr) minmax(210px, 1.5fr) minmax(110px, .7fr) minmax(100px, .6fr); }
+
+@media (max-width: 720px) {
+  .content:has(> .panel.table-panel) { padding: 28px 18px 40px; }
+  .content:has(> .panel.table-panel) > .panel.table-panel { padding: 20px 0 30px; }
+  .content:has(> .panel.table-panel) > .panel.table-panel .search-box { height: 52px; }
+  .content:has(> .panel.table-panel) > .panel.table-panel .table-row { min-height: 64px; padding: 12px 0; gap: 8px; font-size: 12px; }
+  .content:has(> .panel.table-panel) > .panel.table-panel .table-row strong { font-size: 13px; }
+}

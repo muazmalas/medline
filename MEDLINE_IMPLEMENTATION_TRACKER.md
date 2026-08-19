@@ -1564,6 +1564,7 @@ Security/dependency scans
 - [x] Split administrator partner management into separate Pharmacies and Warehouses navigation/table views, added backend partner-type filtering, and added company/organization information to role assignments. React validation: 19 tests pass, 49.17% statements and 67.64% lines; targeted Laravel authorization and full 24-test suite pass.
 - [x] Added searchable role assignments with server-side user search across name, email, company, and role; shared operational and rating tables retain their existing search controls. React validation: 19 tests pass, 49.24% statements and 67.70% lines; Laravel validation: 24 tests and 73 assertions pass.
 - [x] Added shared abbreviated-month date and SYP currency formatters and applied them to the order detail invoice/timeline, with formatter tests. React validation: 19 tests pass and the production build passes.
+- [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.
 - [ ] SMS verification and delivery notifications.
