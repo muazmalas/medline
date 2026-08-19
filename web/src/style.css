@@ -253,8 +253,8 @@ nav button b { font-size: 10px; margin-left: auto; min-width: 22px; text-align: 
 .content > .panel:first-of-type .inline-form { align-items: end; }
 .content > .panel:first-of-type .inline-form input, .content > .panel:first-of-type .inline-form select { min-height: 48px; }
 .content > .panel:first-of-type .inline-form .primary-button { min-height: 48px; }
-.register-launch { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); color: #0e82ad; font-weight: 800; font-size: 13px; text-decoration: none; background: #fff; border: 1px solid #cfe4ed; border-radius: 999px; padding: 11px 20px; box-shadow: 0 8px 22px #17384e18; z-index: 3; }
-.register-launch:hover { background: #eef9fd; }
+.register-launch { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); color: #167ca5; font-weight: 700; font-size: 12px; line-height: 1.4; text-decoration: none; background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none; z-index: 3; }
+.register-launch:hover { color: #0d5878; text-decoration: underline; text-underline-offset: 3px; }
 .login-composite { position: relative; min-height: 100vh; }
 .login-composite .register-launch { left: calc(50% - 205px); top: calc(50% + 185px); bottom: auto; transform: none; }
 .login-card form .text-button { width: auto; margin-left: auto; text-align: right; }
