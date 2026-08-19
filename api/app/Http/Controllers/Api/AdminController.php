@@ -136,7 +136,7 @@ class AdminController extends Controller
     {
         abort_unless(request()->user()->role === 'admin', 403);
         $profile = DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $driver)->select('drivers.*', 'users.name', 'users.email')->firstOrFail();
-        $trips = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.driver_id', $driver)->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'))->latest('deliveries.created_at')->get()->map(function ($trip) {
+        $trips = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.driver_id', $driver)->select('deliveries.id', 'deliveries.public_id', 'deliveries.order_id', 'deliveries.procurement_order_id', 'deliveries.status', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'))->latest('deliveries.created_at')->get()->map(function ($trip) {
             $start = $trip->claimed_at ? strtotime((string) $trip->claimed_at) : null;
             $end = $trip->completed_at ? strtotime((string) $trip->completed_at) : ($start ? now()->timestamp : null);
             $trip->duration_minutes = $start && $end ? max(1, (int) round(($end - $start) / 60)) : null;
