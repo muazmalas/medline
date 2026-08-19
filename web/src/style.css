@@ -355,7 +355,7 @@ label:not(:has(input[required])):not(:has(select[required])):not(:has(textarea[r
 .notification-table .status-pill { padding: 8px 14px; font-size: 12px; font-weight: 800; border: 1px solid #bde8d5; }
 .notification-table .notification-status-unread { color: #9b6810; background: #fff7e6; border-color: #f0d08a; }
 .notification-table .notification-status-read { color: #25815f; background: #eaf8f1; }
-.correction-panel { border: 1px solid #f0d08a; background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%); }
+.correction-panel { margin-bottom: 24px; border: 1px solid #f0d08a; background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%); }
 .correction-panel .panel-heading { align-items: flex-start; }
 .correction-status { color: #9b6810; background: #fff7e6; border-color: #f0d08a; }
 .correction-form { margin-top: 22px; }
