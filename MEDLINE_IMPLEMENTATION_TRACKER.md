@@ -1568,6 +1568,7 @@ Security/dependency scans
 - [x] Redesigned order details with invoice hierarchy, driver assignment card, vehicle/contact details, and responsive stepwise delivery timeline. Validation: 19 React tests pass, 26 Laravel tests/79 assertions pass, and the production build succeeds.
 - [x] Added order route mapping with pickup and drop-off coordinates, visual route line, location labels, legend, OpenStreetMap directions link, coordinate fallback state, and demo pharmacy coordinates for committee scenarios. Tests/build intentionally not run per owner instruction.
 - [x] Aligned delivery detail with order detail UX: added driver card, assignment/invoice hierarchy, pickup/drop-off route map, live-location panel, and stepwise delivery timeline for active and terminal deliveries. Tests/build intentionally not run per owner instruction.
+- [x] Added administrator pharmacy/warehouse detail views with business, license, contact, subscription, address, and OpenStreetMap location details; directory rows now provide a View details action. Tests/build intentionally not run per owner instruction.
 - [x] Redesigned operational queue tables as full-width workspaces: removed restrictive card treatment, increased headings/search/table typography, enlarged row spacing and status controls, improved column proportions, and retained a responsive mobile layout. React validation: 19 tests pass and the production build passes.
 
 - [ ] Real-time online payment gateway and webhook reconciliation.

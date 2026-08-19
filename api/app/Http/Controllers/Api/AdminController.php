@@ -125,6 +125,13 @@ class AdminController extends Controller
         return response()->json($partners);
     }
 
+    public function partner(Partner $partner): JsonResponse
+    {
+        abort_unless(request()->user()->role === 'admin', 403);
+        $record = DB::table('partners')->leftJoin('users', 'users.id', '=', 'partners.user_id')->where('partners.id', $partner->id)->select('partners.*', 'users.name as contact_name', 'users.email as contact_email')->firstOrFail();
+        return response()->json(['partner' => $record]);
+    }
+
     public function deliveries(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
