@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -71,7 +71,7 @@ String localizedWorkflowAction(BuildContext context, String action) {
     'Admin operations': '\u0639\u0645\u0644\u064a\u0627\u062a \u0627\u0644\u0645\u062f\u064a\u0631',
     'Operational alert': '\u062a\u0646\u0628\u064a\u0647 \u062a\u0634\u063a\u064a\u0644\u064a',
     'Pending updates': '\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0645\u0639\u0644\u0642\u0629',
-    'Updates will sync when the connection is restored.': '\u0633\u062a\u062a\u0645 \u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0639\u0646\u062f \u0627س\u062a\u0639\u0627د\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644.',
+    'Updates will sync when the connection is restored.': '\u0633\u062a\u062a\u0645 \u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0639\u0646\u062f \u0627Ø³\u062a\u0639\u0627Ø¯\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644.',
   };
   return labels[action] ?? action;
 }
@@ -170,8 +170,8 @@ String localizedOperationsText(BuildContext context, String key) {
   final arabic = Localizations.localeOf(context).languageCode == 'ar';
   final labels = arabic
       ? {
-          'support': 'الدعم والشكاوى', 'new_support': 'طلب دعم جديد', 'subject': 'الموضوع', 'describe_issue': 'صف المشكلة', 'attach_evidence': 'إرفاق دليل (اختياري)', 'evidence_attached': 'تم إرفاق الدليل', 'no_support': 'لا توجد طلبات دعم حالياً',
-          'procurement': 'طلب مخزون المستودع', 'warehouse_stock': 'إنشاء طلب توريد للشركات', 'receiving_address': 'عنوان الاستلام', 'submit_request': 'إرسال الطلب', 'report_failed': 'الإبلاغ عن فشل التوصيل', 'reason': 'السبب', 'report': 'إبلاغ', 'confirm_delivery': 'تأكيد التوصيل', 'delivery_pin': 'رمز توصيل المريض', 'complete': 'إكمال', 'prescription_uploaded': 'تم رفع الوصفة لمراجعة الصيدلي', 'rate_order': 'تقييم طلبك', 'comment': 'تعليق (اختياري)', 'cancel': 'إلغاء', 'submit': 'إرسال',
+          'support': 'Ø§Ù„Ø¯Ø¹Ù… ÙˆØ§Ù„Ø´ÙƒØ§ÙˆÙ‰', 'new_support': 'Ø·Ù„Ø¨ Ø¯Ø¹Ù… Ø¬Ø¯ÙŠØ¯', 'subject': 'Ø§Ù„Ù…ÙˆØ¶ÙˆØ¹', 'describe_issue': 'ØµÙ Ø§Ù„Ù…Ø´ÙƒÙ„Ø©', 'attach_evidence': 'Ø¥Ø±ÙØ§Ù‚ Ø¯Ù„ÙŠÙ„ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)', 'evidence_attached': 'ØªÙ… Ø¥Ø±ÙØ§Ù‚ Ø§Ù„Ø¯Ù„ÙŠÙ„', 'no_support': 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ø¯Ø¹Ù… Ø­Ø§Ù„ÙŠØ§Ù‹',
+          'procurement': 'Ø·Ù„Ø¨ Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹', 'warehouse_stock': 'Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ ØªÙˆØ±ÙŠØ¯ Ù„Ù„Ø´Ø±ÙƒØ§Øª', 'receiving_address': 'Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…', 'submit_request': 'Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨', 'report_failed': 'Ø§Ù„Ø¥Ø¨Ù„Ø§Øº Ø¹Ù† ÙØ´Ù„ Ø§Ù„ØªÙˆØµÙŠÙ„', 'reason': 'Ø§Ù„Ø³Ø¨Ø¨', 'report': 'Ø¥Ø¨Ù„Ø§Øº', 'confirm_delivery': 'ØªØ£ÙƒÙŠØ¯ Ø§Ù„ØªÙˆØµÙŠÙ„', 'delivery_pin': 'Ø±Ù…Ø² ØªÙˆØµÙŠÙ„ Ø§Ù„Ù…Ø±ÙŠØ¶', 'complete': 'Ø¥ÙƒÙ…Ø§Ù„', 'prescription_uploaded': 'ØªÙ… Ø±ÙØ¹ Ø§Ù„ÙˆØµÙØ© Ù„Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„ØµÙŠØ¯Ù„ÙŠ', 'rate_order': 'ØªÙ‚ÙŠÙŠÙ… Ø·Ù„Ø¨Ùƒ', 'comment': 'ØªØ¹Ù„ÙŠÙ‚ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)', 'cancel': 'Ø¥Ù„ØºØ§Ø¡', 'submit': 'Ø¥Ø±Ø³Ø§Ù„',
         }
       : {
           'support': 'Support and complaints', 'new_support': 'New support request', 'subject': 'Subject', 'describe_issue': 'Describe the issue', 'attach_evidence': 'Attach evidence (optional)', 'evidence_attached': 'Evidence attached', 'no_support': 'No support requests yet.',
@@ -209,8 +209,8 @@ String localizedStatus(BuildContext context, String value) {
   final normalized = value.replaceAll('_', ' ');
   if (Localizations.localeOf(context).languageCode != 'ar') return normalized.toUpperCase();
   const labels = {
-    'pending': 'قيد الانتظار', 'approved': 'معتمد', 'active': 'نشط', 'completed': 'مكتمل', 'cancelled': 'ملغى', 'rejected': 'مرفوض',
-    'prescription required': 'الوصفة مطلوبة', 'pending pharmacy review': 'بانتظار مراجعة الصيدلية', 'prescription review': 'مراجعة الوصفة', 'accepted': 'مقبول', 'partially accepted': 'مقبول جزئياً', 'ready for delivery': 'جاهز للتوصيل', 'available': 'متاح', 'claimed': 'تم الاستلام', 'pickup started': 'بدأ الاستلام', 'picked up': 'تم الاستلام', 'in transit': 'قيد التوصيل', 'arrived': 'وصل', 'failed': 'فشل', 'open': 'مفتوح', 'in review': 'قيد المراجعة', 'resolved': 'تم الحل', 'under review': 'قيد المراجعة',
+    'pending': 'Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±', 'approved': 'Ù…Ø¹ØªÙ…Ø¯', 'active': 'Ù†Ø´Ø·', 'completed': 'Ù…ÙƒØªÙ…Ù„', 'cancelled': 'Ù…Ù„ØºÙ‰', 'rejected': 'Ù…Ø±ÙÙˆØ¶',
+    'prescription required': 'Ø§Ù„ÙˆØµÙØ© Ù…Ø·Ù„ÙˆØ¨Ø©', 'pending pharmacy review': 'Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„ØµÙŠØ¯Ù„ÙŠØ©', 'prescription review': 'Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„ÙˆØµÙØ©', 'accepted': 'Ù…Ù‚Ø¨ÙˆÙ„', 'partially accepted': 'Ù…Ù‚Ø¨ÙˆÙ„ Ø¬Ø²Ø¦ÙŠØ§Ù‹', 'ready for delivery': 'Ø¬Ø§Ù‡Ø² Ù„Ù„ØªÙˆØµÙŠÙ„', 'available': 'Ù…ØªØ§Ø­', 'claimed': 'ØªÙ… Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…', 'pickup started': 'Ø¨Ø¯Ø£ Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…', 'picked up': 'ØªÙ… Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…', 'in transit': 'Ù‚ÙŠØ¯ Ø§Ù„ØªÙˆØµÙŠÙ„', 'arrived': 'ÙˆØµÙ„', 'failed': 'ÙØ´Ù„', 'open': 'Ù…ÙØªÙˆØ­', 'in review': 'Ù‚ÙŠØ¯ Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©', 'resolved': 'ØªÙ… Ø§Ù„Ø­Ù„', 'under review': 'Ù‚ÙŠØ¯ Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©',
   };
   final corrected = <String, String>{
     ...labels,
@@ -249,7 +249,7 @@ String localizedOrderText(BuildContext context, String key) {
   if (key == 'map_unavailable') return arabic ? '\u062a\u0639\u0630\u0631 \u0641\u062a\u062d \u0645\u0648\u0642\u0639 \u0627\u0644\u062a\u0648\u0635\u064a\u0644' : 'Unable to open the delivery location.';
   final labels = arabic
       ? {
-          'details': 'تفاصيل الطلب', 'rate': 'تقييم هذا الطلب', 'your_rating': 'تقييمك', 'thank_you': 'شكراً لملاحظاتك.', 'delivery_pin': 'رمز التوصيل', 'invoice': 'ملخص الفاتورة', 'subtotal': 'المجموع الفرعي', 'delivery_fee': 'رسوم التوصيل', 'total': 'الإجمالي', 'payment': 'الدفع', 'timeline': 'الجدول الزمني للتوصيل', 'timeline_empty': 'سيظهر الجدول الزمني للتوصيل مع تقدم الطلب.',
+          'details': 'ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨', 'rate': 'ØªÙ‚ÙŠÙŠÙ… Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨', 'your_rating': 'ØªÙ‚ÙŠÙŠÙ…Ùƒ', 'thank_you': 'Ø´ÙƒØ±Ø§Ù‹ Ù„Ù…Ù„Ø§Ø­Ø¸Ø§ØªÙƒ.', 'delivery_pin': 'Ø±Ù…Ø² Ø§Ù„ØªÙˆØµÙŠÙ„', 'invoice': 'Ù…Ù„Ø®Øµ Ø§Ù„ÙØ§ØªÙˆØ±Ø©', 'subtotal': 'Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ', 'delivery_fee': 'Ø±Ø³ÙˆÙ… Ø§Ù„ØªÙˆØµÙŠÙ„', 'total': 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ', 'payment': 'Ø§Ù„Ø¯ÙØ¹', 'timeline': 'Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ Ù„Ù„ØªÙˆØµÙŠÙ„', 'timeline_empty': 'Ø³ÙŠØ¸Ù‡Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ Ù„Ù„ØªÙˆØµÙŠÙ„ Ù…Ø¹ ØªÙ‚Ø¯Ù… Ø§Ù„Ø·Ù„Ø¨.',
         }
       : {
           'details': 'Order details', 'rate': 'Rate this order', 'your_rating': 'Your rating', 'thank_you': 'Thank you for your feedback.', 'delivery_pin': 'Delivery PIN', 'invoice': 'Invoice summary', 'subtotal': 'Subtotal', 'delivery_fee': 'Delivery fee', 'total': 'Total', 'payment': 'Payment', 'timeline': 'Delivery timeline', 'timeline_empty': 'The delivery timeline will appear as the order progresses.',
@@ -266,10 +266,10 @@ String localizedDashboardText(BuildContext context, String key) {
   if (key == 'today') return arabic ? '\u0645\u0644\u062e\u0635 \u0627\u0644\u064a\u0648\u0645' : "Today's overview";
   final labels = arabic
       ? {
-          'orders': 'الطلبات', 'pending': 'قيد الانتظار', 'deliveries': 'التوصيلات', 'low_stock': 'مخزون منخفض', 'search_begin': 'ابحث عن دواء للبدء.', 'assigned_work': 'ستظهر المهام المسندة إليك هنا.', 'driver_availability': 'توفر السائق', 'available_jobs': 'متاح لمهام التوصيل', 'approved_driver': 'سائق معتمد · يمكن استلام مهام جديدة.', 'approval_status': 'حالة الاعتماد', 'available': 'متاح', 'not_available': 'غير متاح'
+          'orders': 'Ø§Ù„Ø·Ù„Ø¨Ø§Øª', 'pending': 'Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±', 'deliveries': 'Ø§Ù„ØªÙˆØµÙŠÙ„Ø§Øª', 'low_stock': 'Ù…Ø®Ø²ÙˆÙ† Ù…Ù†Ø®ÙØ¶', 'search_begin': 'Ø§Ø¨Ø­Ø« Ø¹Ù† Ø¯ÙˆØ§Ø¡ Ù„Ù„Ø¨Ø¯Ø¡.', 'assigned_work': 'Ø³ØªØ¸Ù‡Ø± Ø§Ù„Ù…Ù‡Ø§Ù… Ø§Ù„Ù…Ø³Ù†Ø¯Ø© Ø¥Ù„ÙŠÙƒ Ù‡Ù†Ø§.', 'driver_availability': 'ØªÙˆÙØ± Ø§Ù„Ø³Ø§Ø¦Ù‚', 'available_jobs': 'Ù…ØªØ§Ø­ Ù„Ù…Ù‡Ø§Ù… Ø§Ù„ØªÙˆØµÙŠÙ„', 'approved_driver': 'Ø³Ø§Ø¦Ù‚ Ù…Ø¹ØªÙ…Ø¯ Â· ÙŠÙ…ÙƒÙ† Ø§Ø³ØªÙ„Ø§Ù… Ù…Ù‡Ø§Ù… Ø¬Ø¯ÙŠØ¯Ø©.', 'approval_status': 'Ø­Ø§Ù„Ø© Ø§Ù„Ø§Ø¹ØªÙ…Ø§Ø¯', 'available': 'Ù…ØªØ§Ø­', 'not_available': 'ØºÙŠØ± Ù…ØªØ§Ø­'
         }
       : {
-          'orders': 'Orders', 'pending': 'Pending', 'deliveries': 'Deliveries', 'low_stock': 'Low stock', 'search_begin': 'Search for a medicine to begin.', 'assigned_work': 'Your assigned work will appear here.', 'driver_availability': 'Driver availability', 'available_jobs': 'Available for delivery jobs', 'approved_driver': 'Approved driver · new jobs can be claimed.', 'approval_status': 'Approval status', 'available': 'Available', 'not_available': 'Not available'
+          'orders': 'Orders', 'pending': 'Pending', 'deliveries': 'Deliveries', 'low_stock': 'Low stock', 'search_begin': 'Search for a medicine to begin.', 'assigned_work': 'Your assigned work will appear here.', 'driver_availability': 'Driver availability', 'available_jobs': 'Available for delivery jobs', 'approved_driver': 'Approved driver Â· new jobs can be claimed.', 'approval_status': 'Approval status', 'available': 'Available', 'not_available': 'Not available'
         };
   return labels[key] ?? key;
 }
@@ -325,7 +325,7 @@ String localizedAuthText(BuildContext context, String key) {
     'create_account': '\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628 \u0645\u064a\u062f\u0644\u0627\u064a\u0646',
     'browse_guest': '\u062a\u0635\u0641\u062d \u0643\u0636\u064a\u0641',
     'reset_password': '\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631',
-    'recovery_hint': '\u0627\u0637\u0644\u0628 \u0631\u0645\u0632 \u0627\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f، \u062b\u0645 \u0623\u062f\u062e\u0644 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u0631\u0633\u0644 \u0625\u0644\u0649 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a.',
+    'recovery_hint': '\u0627\u0637\u0644\u0628 \u0631\u0645\u0632 \u0627\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062fØŒ \u062b\u0645 \u0623\u062f\u062e\u0644 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u0631\u0633\u0644 \u0625\u0644\u0649 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a.',
     'send_recovery': '\u0625\u0631\u0633\u0627\u0644 \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u0627\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f',
     'recovery_token': '\u0631\u0645\u0632 \u0627\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f',
     'new_password': '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062c\u062f\u064a\u062f\u0629',
@@ -363,11 +363,11 @@ String localizedProfileText(BuildContext context, String key) {
     }[key] ?? key;
   }
   return {
-    'profile': '\u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a', 'choose_language': '\u0627\u062e\u062a\u0631 \u0627\u0644\u0644\u063a\u0629', 'verify_email': '\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a', 'verification_hint': '\u0625\u0631\u0633\u0627ل \u0631\u0627\u0628\u0637 \u062a\u0623\u0643\u064a\u062f \u062c\u062f\u064a\u062f.',
+    'profile': '\u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a', 'choose_language': '\u0627\u062e\u062a\u0631 \u0627\u0644\u0644\u063a\u0629', 'verify_email': '\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a', 'verification_hint': '\u0625\u0631\u0633\u0627Ù„ \u0631\u0627\u0628\u0637 \u062a\u0623\u0643\u064a\u062f \u062c\u062f\u064a\u062f.',
     'verification_sent': '\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u0627\u0644\u062a\u0623\u0643\u064a\u062f.', 'saved_addresses': '\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629', 'addresses_hint': '\u0625\u062f\u0627\u0631\u0629 \u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0629 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0637\u0644\u0628.',
     'verification_documents': '\u0645\u0633\u062a\u0646\u062f\u0627\u062a \u0627\u0644\u062a\u062d\u0642\u0642', 'documents_hint': '\u0625\u0631\u0633\u0627\u0644 \u0648\u062a\u062a\u0628\u0639 \u0645\u0633\u062a\u0646\u062f\u0627\u062a \u0627\u0644\u0647\u0648\u064a\u0629 \u0623\u0648 \u0627\u0644\u062a\u0631\u062e\u064a\u0635.', 'support': '\u0627\u0644\u062f\u0639\u0645 \u0648\u0627\u0644\u0634\u0643\u0627\u0648\u0649',
-    'support_hint': '\u0625\u0628\u0644\u0627\u063a \u0639\u0646 \u0645\u0634\u0643\u0644\u0629 \u0623\u0648 \u0645\u0631\u0627\u062c\u0639\u0629 \u0637\u0644\u0628\u0627\u062a \u0627\u0644\u062f\u0639\u0645.', 'notification_preferences': '\u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a', 'notifications_hint': '\u0627\u062e\u062a\u0631 \u0643\u064a\u0641\u064a\u0629 \u0625رسال \u0645\u064aد\u0644اي\u0646 \u0644ل\u062a\u062d\u062f\u064a\u062b\u0627ت.',
-    'language': '\u0627\u0644\u0644\u063a\u0629', 'privacy': '\u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a', 'privacy_hint': '\u0645\u0631\u0627\u062c\u0639\u0629 \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629.', 'privacy_consent': '\u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629', 'consent_summary': '\u064a\u062a\u0645 \u062a\u062e\u0632\u064a\u0646 \u062e\u064a\u0627\u0631\u0627\u062a \u0645\u0648\u0627فقتك \u0645\u0639 \u0646س\u062e\u0629 \u0627\u0644\u0633\u064a\u0627\u0633\u0629 \u0648\u0633\u062c\u0644 \u0627\u0644\u062a\u062f\u0642\u064a\u0642.', 'terms': '\u0634\u0631\u0648\u0637 \u0627\u0644\u062e\u062f\u0645\u0629', 'terms_hint': '\u0645\u0637\u0644\u0648\u0628\u0629 \u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u062e\u062f\u0645\u0629 \u0645\u064a\u062f\u0644\u0627\u064a\u0646.', 'policy': '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629', 'policy_hint': '\u0625\u0642\u0631\u0627\u0631 \u0628\u0643\u064a\u0641\u064a\u0629 \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0637\u0628\u064a\u0629 \u0648\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u0633\u0627\u0628.', 'marketing': '\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0645\u0646\u062a\u062c \u0627\u062e\u062a\u064a\u0627\u0631\u064a\u0629', 'marketing_hint': '\u062a\u0644\u0642\u064a \u0631\u0633\u0627\u0626\u0644 \u0645\u064a\u062f\u0644\u0627\u064a\u0646 \u063a\u064a\u0631 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629.', 'address_title': '\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629', 'add_address': '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646', 'label': '\u0627\u0644\u062a\u0633\u0645\u064a\u0629', 'address': '\u0627\u0644\u0639\u0646\u0648\u0627\u0646', 'city': '\u0627\u0644\u0645\u062f\u064a\u0646\u0629', 'no_addresses': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0646\u0627\u0648\u064a\u0646 \u0645\u062d\u0641\u0648\u0638\u0629 \u0628\u0639\u062f.', 'sign_out': '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c', 'return_roles': '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u062f\u0648\u0631',
+    'support_hint': '\u0625\u0628\u0644\u0627\u063a \u0639\u0646 \u0645\u0634\u0643\u0644\u0629 \u0623\u0648 \u0645\u0631\u0627\u062c\u0639\u0629 \u0637\u0644\u0628\u0627\u062a \u0627\u0644\u062f\u0639\u0645.', 'notification_preferences': '\u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a', 'notifications_hint': '\u0627\u062e\u062a\u0631 \u0643\u064a\u0641\u064a\u0629 \u0625Ø±Ø³Ø§Ù„ \u0645\u064aØ¯\u0644Ø§ÙŠ\u0646 \u0644Ù„\u062a\u062d\u062f\u064a\u062b\u0627Øª.',
+    'language': '\u0627\u0644\u0644\u063a\u0629', 'privacy': '\u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a', 'privacy_hint': '\u0645\u0631\u0627\u062c\u0639\u0629 \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629.', 'privacy_consent': '\u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629', 'consent_summary': '\u064a\u062a\u0645 \u062a\u062e\u0632\u064a\u0646 \u062e\u064a\u0627\u0631\u0627\u062a \u0645\u0648\u0627ÙÙ‚ØªÙƒ \u0645\u0639 \u0646Ø³\u062e\u0629 \u0627\u0644\u0633\u064a\u0627\u0633\u0629 \u0648\u0633\u062c\u0644 \u0627\u0644\u062a\u062f\u0642\u064a\u0642.', 'terms': '\u0634\u0631\u0648\u0637 \u0627\u0644\u062e\u062f\u0645\u0629', 'terms_hint': '\u0645\u0637\u0644\u0648\u0628\u0629 \u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u062e\u062f\u0645\u0629 \u0645\u064a\u062f\u0644\u0627\u064a\u0646.', 'policy': '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629', 'policy_hint': '\u0625\u0642\u0631\u0627\u0631 \u0628\u0643\u064a\u0641\u064a\u0629 \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0637\u0628\u064a\u0629 \u0648\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u0633\u0627\u0628.', 'marketing': '\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0645\u0646\u062a\u062c \u0627\u062e\u062a\u064a\u0627\u0631\u064a\u0629', 'marketing_hint': '\u062a\u0644\u0642\u064a \u0631\u0633\u0627\u0626\u0644 \u0645\u064a\u062f\u0644\u0627\u064a\u0646 \u063a\u064a\u0631 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629.', 'address_title': '\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629', 'add_address': '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646', 'label': '\u0627\u0644\u062a\u0633\u0645\u064a\u0629', 'address': '\u0627\u0644\u0639\u0646\u0648\u0627\u0646', 'city': '\u0627\u0644\u0645\u062f\u064a\u0646\u0629', 'no_addresses': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0646\u0627\u0648\u064a\u0646 \u0645\u062d\u0641\u0648\u0638\u0629 \u0628\u0639\u062f.', 'sign_out': '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c', 'return_roles': '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u062f\u0648\u0631',
   }[key] ?? key;
 }
 
@@ -658,7 +658,7 @@ class _RoleHomeState extends State<RoleHome> {
   Widget build(BuildContext context) {
     final title = localizedRole(context, widget.role);
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xff082f49), foregroundColor: Colors.white, title: Text('MedLine • $title'), actions: [IconButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotificationPage(session: widget.session))), icon: const Icon(Icons.notifications_none_rounded), tooltip: localizedCatalogText(context, 'notifications'))]),
+      appBar: AppBar(backgroundColor: const Color(0xff082f49), foregroundColor: Colors.white, title: Text('MedLine â€¢ $title'), actions: [IconButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotificationPage(session: widget.session))), icon: const Icon(Icons.notifications_none_rounded), tooltip: localizedCatalogText(context, 'notifications'))]),
       body: SafeArea(child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: ListView(padding: const EdgeInsets.all(20), children: [
         ValueListenableBuilder<bool>(valueListenable: medlineConnection, builder: (context, online, _) => online ? const SizedBox.shrink() : Card(color: const Color(0xfffff3cd), elevation: 0, child: ListTile(leading: const Icon(Icons.cloud_off_rounded, color: Colors.orange), title: Text(localizedWorkflowAction(context, 'Offline')), subtitle: Text(localizedWorkflowAction(context, 'Reconnect to refresh live data.')), trailing: IconButton(onPressed: loadDashboard, icon: const Icon(Icons.refresh_rounded), tooltip: localizedWorkflowAction(context, 'Retry'))))),
         ValueListenableBuilder<int>(valueListenable: pendingMutations, builder: (context, count, _) => count == 0 ? const SizedBox.shrink() : Card(color: const Color(0xffe8f5fa), elevation: 0, child: ListTile(leading: const Icon(Icons.sync_rounded, color: Color(0xff1689b8)), title: Text('${localizedWorkflowAction(context, 'Pending updates')}: $count'), subtitle: Text(localizedWorkflowAction(context, 'Updates will sync when the connection is restored.')), trailing: IconButton(onPressed: () => unawaited(widget.session.api.flushPendingMutations()), icon: const Icon(Icons.refresh_rounded), tooltip: localizedWorkflowAction(context, 'Retry'))))),
@@ -776,26 +776,46 @@ class MedicineDetailPage extends StatelessWidget {
   final Session session;
 
   Future<void> addToCart(BuildContext context) async {
-    try { final current = await session.api.cart(); var quantity = 0; for (final raw in ((current['items'] as List?) ?? [])) { if (raw is Map && '${raw['medicine_id']}' == '${medicine['id']}') quantity = int.tryParse('${raw['quantity']}') ?? 0; } await session.api.updateCartItem(int.parse('${medicine['id']}'), quantity + 1); if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${localizedCatalogText(context, 'add_to_cart')} ✓'))); Navigator.of(context).pop(); } }
+    try { final current = await session.api.cart(); var quantity = 0; for (final raw in ((current['items'] as List?) ?? [])) { if (raw is Map && '${raw['medicine_id']}' == '${medicine['id']}') quantity = int.tryParse('${raw['quantity']}') ?? 0; } await session.api.updateCartItem(int.parse('${medicine['id']}'), quantity + 1); if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${localizedCatalogText(context, 'add_to_cart')} âœ“'))); Navigator.of(context).pop(); } }
     catch (exception) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(exception.toString()))); }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedCatalogText(context, 'medicine_details'))),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text('${medicine['name_en'] ?? 'Medicine'}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-        Text('${medicine['name_ar'] ?? ''}'),
-        const SizedBox(height: 16),
-        _detail(localizedCatalogText(context, 'manufacturer'), medicine['manufacturer']),
-        _detail(localizedCatalogText(context, 'form'), medicine['form']),
-        _detail(localizedCatalogText(context, 'dosage'), medicine['dosage']),
-        FilledButton.icon(onPressed: () => addToCart(context), icon: const Icon(Icons.add_shopping_cart_rounded), label: Text(localizedCatalogText(context, 'add_to_cart'))),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(localizedCatalogText(context, 'medicine_details'))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(radius: 32, backgroundColor: Color(0xffe8f5fa), child: Text('Rx', style: TextStyle(color: Color(0xff1689b8), fontSize: 20, fontWeight: FontWeight.w800))),
+                  const SizedBox(height: 16),
+                  Text('${medicine['name_en'] ?? 'Medicine'}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text('${medicine['name_ar'] ?? ''}', style: const TextStyle(fontSize: 18, color: Color(0xff527386))),
+                  const Divider(height: 28),
+                  _detail(localizedCatalogText(context, 'manufacturer'), medicine['manufacturer']),
+                  _detail(localizedCatalogText(context, 'form'), medicine['form']),
+                  _detail(localizedCatalogText(context, 'dosage'), medicine['dosage']),
+                  _detail(localizedCatalogText(context, 'code'), medicine['code']),
+                  const SizedBox(height: 12),
+                  if (medicine['prescription_required'] == true) Text(localizedCatalogText(context, 'prescription_required'), style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(onPressed: () => addToCart(context), icon: const Icon(Icons.add_shopping_cart_rounded), label: Text(localizedCatalogText(context, 'add_to_cart'))),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   static Widget _detail(String label, dynamic value) { if (value == null || '$value'.isEmpty) return const SizedBox.shrink(); return Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('$label: $value', style: const TextStyle(fontSize: 15))); }
 }
@@ -822,21 +842,7 @@ class _PharmacyDirectoryPageState extends State<PharmacyDirectoryPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedCatalogText(context, 'approved_pharmacies')), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh_rounded))]),
-    body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: pharmacies.length,
-      itemBuilder: (context, index) {
-        final pharmacy = pharmacies[index];
-        return Card(child: ListTile(
-          leading: const Icon(Icons.local_pharmacy_outlined),
-          title: Text('${pharmacy['business_name'] ?? pharmacy['name'] ?? 'Approved pharmacy'}'),
-          subtitle: Text('${pharmacy['city'] ?? pharmacy['address'] ?? ''}'),
-        ));
-      },
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedCatalogText(context, 'approved_pharmacies')), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh_rounded))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : pharmacies.isEmpty ? Center(child: Text(localizedCatalogText(context, 'no_pharmacies'))) : ListView.builder(padding: const EdgeInsets.all(20), itemCount: pharmacies.length, itemBuilder: (context, index) { final pharmacy = pharmacies[index]; return Card(elevation: 0, margin: const EdgeInsets.only(bottom: 12), child: ListTile(leading: const CircleAvatar(backgroundColor: Color(0xffe8f5fa), child: Icon(Icons.local_pharmacy_outlined, color: Color(0xff1689b8))), title: Text('${pharmacy['business_name'] ?? pharmacy['name'] ?? 'Approved pharmacy'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${pharmacy['city'] ?? pharmacy['address'] ?? 'Service area pending'}\nStatus: ${pharmacy['subscription_status'] ?? 'active'}'), isThreeLine: true)); }));
 }
 
 class CartPage extends StatefulWidget {
@@ -886,7 +892,7 @@ class _CartPageState extends State<CartPage> {
       await widget.session.api.createOrder({'pharmacy_id': pharmacies.first['id'], if (selectedAddressId != null) 'address_id': selectedAddressId else 'delivery_address_snapshot': address.text.trim(), 'items': items.map((item) => {'medicine_id': item['medicine_id'], 'quantity': item['quantity']}).toList()}, idempotencyKey: checkoutIdempotencyKey);
       await widget.session.api.clearCart();
       checkoutIdempotencyKey = null;
-      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${localizedCatalogText(context, 'place_order')} ✓'))); Navigator.of(context).pop(); }
+      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${localizedCatalogText(context, 'place_order')} âœ“'))); Navigator.of(context).pop(); }
     } catch (exception) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(exception.toString()))); }
     finally { if (mounted) setState(() => submitting = false); }
   }
@@ -895,21 +901,7 @@ class _CartPageState extends State<CartPage> {
   void dispose() { address.dispose(); super.dispose(); }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedCatalogText(context, 'my_cart'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (items.isEmpty) Center(child: Text(localizedCatalogText(context, 'cart_empty'))),
-        ...items.map((item) => Card(child: ListTile(
-          title: Text('${item['name_en'] ?? 'Medicine'}'),
-          subtitle: Text('${item['quantity'] ?? 1}'),
-          trailing: IconButton(onPressed: () => changeQuantity(item, (int.tryParse('${item['quantity']}') ?? 1) + 1), icon: const Icon(Icons.add_circle_outline)),
-        ))),
-        if (items.isNotEmpty) FilledButton.icon(onPressed: checkout, icon: const Icon(Icons.shopping_bag_outlined), label: Text(localizedCatalogText(context, 'place_order'))),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedCatalogText(context, 'my_cart'))), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : items.isEmpty ? Center(child: Text(localizedCatalogText(context, 'cart_empty'))) : ListView(padding: const EdgeInsets.all(20), children: [...items.map((item) => Card(elevation: 0, child: ListTile(title: Text('${item['name_en'] ?? 'Medicine'}'), subtitle: Text('${item['name_ar'] ?? ''}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () => changeQuantity(item, (int.tryParse('${item['quantity']}') ?? 1) - 1), icon: const Icon(Icons.remove_circle_outline)), Text('${item['quantity']}'), IconButton(onPressed: () => changeQuantity(item, (int.tryParse('${item['quantity']}') ?? 0) + 1), icon: const Icon(Icons.add_circle_outline))])))), const SizedBox(height: 16), if (savedAddresses.isNotEmpty) DropdownButtonFormField<int>(value: selectedAddressId, decoration: InputDecoration(labelText: localizedCatalogText(context, 'saved_delivery_address'), border: const OutlineInputBorder()), items: savedAddresses.map((item) => DropdownMenuItem<int>(value: int.tryParse('${item['id']}'), child: Text('${item['label'] ?? item['address_line'] ?? 'Saved address'}'))).toList(), onChanged: (value) => setState(() => selectedAddressId = value)), if (savedAddresses.isNotEmpty) const SizedBox(height: 12), TextField(controller: address, maxLines: 3, decoration: InputDecoration(labelText: localizedCatalogText(context, savedAddresses.isEmpty ? 'delivery_address' : 'different_address'), border: const OutlineInputBorder()), onChanged: (_) { if (address.text.trim().isNotEmpty) setState(() => selectedAddressId = null); }), const SizedBox(height: 16), FilledButton.icon(onPressed: checkout, icon: const Icon(Icons.shopping_bag_outlined), label: Text(localizedCatalogText(context, 'place_order')))]));
 }
 
 class NotificationPage extends StatefulWidget {
@@ -974,7 +966,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     final message = data is String ? data : '${row['type'] ?? 'MedLine update'}';
                     final unread = row['read_at'] == null;
                     return Card(elevation: 0, child: ListTile(isThreeLine: true, leading: Icon(unread ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, color: unread ? const Color(0xff1689b8) : Colors.grey), title: Text('${row['type'] ?? 'MedLine notification'}'), subtitle: Text(message), trailing: unread ? IconButton(onPressed: () => markRead('${row['id']}'), icon: const Icon(Icons.done_rounded), tooltip: localizedCatalogText(context, 'mark_read')) : null));
-                  })),
+                  }),
   );
 }
 
@@ -993,7 +985,7 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> changeLocale(BuildContext context) async {
-    final selected = await showDialog<String>(context: context, builder: (context) => SimpleDialog(title: Text(localizedCatalogText(context, 'choose_language')), children: [SimpleDialogOption(onPressed: () => Navigator.pop(context, 'en'), child: const Text('English')), SimpleDialogOption(onPressed: () => Navigator.pop(context, 'ar'), child: const Text('العربية'))]));
+    final selected = await showDialog<String>(context: context, builder: (context) => SimpleDialog(title: Text(localizedCatalogText(context, 'choose_language')), children: [SimpleDialogOption(onPressed: () => Navigator.pop(context, 'en'), child: const Text('English')), SimpleDialogOption(onPressed: () => Navigator.pop(context, 'ar'), child: const Text('Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©'))]));
     if (selected == null) return;
     medlineLocale.value = Locale(selected);
     if (session.isAuthenticated) { try { await session.api.updateProfile({'locale': selected}, idempotencyKey: 'mobile-profile-locale-$selected'); session.user?['locale'] = selected; } catch (exception) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${localizedCatalogText(context, 'language_saved')} $exception'))); } }
@@ -1012,7 +1004,7 @@ class ProfilePage extends StatelessWidget {
     if (session.isAuthenticated && session.user?['role'] == 'admin') ListTile(leading: const Icon(Icons.security_outlined), title: Text(localizedProfileText(context, 'two_factor')), subtitle: Text(localizedProfileText(context, 'two_factor_hint')), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TwoFactorPage(session: session)))),
     if (session.isAuthenticated) ListTile(leading: const Icon(Icons.support_agent_outlined), title: Text(localizedProfileText(context, 'support')), subtitle: Text(localizedProfileText(context, 'support_hint')), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupportPage(session: session)))),
     ListTile(leading: const Icon(Icons.notifications_active_outlined), title: Text(localizedProfileText(context, 'notification_preferences')), subtitle: Text(localizedProfileText(context, 'notifications_hint')), onTap: session.isAuthenticated ? () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotificationPreferencesPage(session: session))) : null),
-    ListTile(leading: const Icon(Icons.language_rounded), title: const Text('Language'), subtitle: Text(medlineLocale.value.languageCode == 'ar' ? 'العربية' : 'English'), onTap: () => changeLocale(context)),
+    ListTile(leading: const Icon(Icons.language_rounded), title: const Text('Language'), subtitle: Text(medlineLocale.value.languageCode == 'ar' ? 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©' : 'English'), onTap: () => changeLocale(context)),
     ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: Text(localizedProfileText(context, 'privacy')), subtitle: Text(localizedProfileText(context, 'privacy_hint')), onTap: session.isAuthenticated ? () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PrivacyConsentPage(session: session))) : null),
     const SizedBox(height: 16),
     OutlinedButton.icon(onPressed: () => signOut(context), icon: const Icon(Icons.logout_rounded), label: Text(localizedProfileText(context, session.isAuthenticated ? 'sign_out' : 'return_roles'))),
@@ -1072,20 +1064,7 @@ class _TwoFactorPageState extends State<TwoFactorPage> {
   void dispose() { code.dispose(); super.dispose(); }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedProfileText(context, 'two_factor'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(localizedProfileText(context, enabled ? 'two_factor_enabled' : 'two_factor_disabled')),
-        if (!enabled) FilledButton(onPressed: working ? null : setup, child: Text(localizedProfileText(context, 'two_factor_setup'))),
-        if (secret != null) SelectableText(secret!),
-        if (secret != null || enabled) TextField(controller: code, keyboardType: TextInputType.number),
-        if (secret != null) FilledButton(onPressed: working ? null : confirm, child: Text(localizedProfileText(context, 'two_factor_confirm'))),
-        if (enabled) OutlinedButton(onPressed: working ? null : disable, child: Text(localizedProfileText(context, 'two_factor_disable'))),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedProfileText(context, 'two_factor'))), body: loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(20), children: [Text(localizedProfileText(context, 'two_factor_hint')), const SizedBox(height: 18), if (error != null) Text(error!, style: const TextStyle(color: Colors.red)), Text(localizedProfileText(context, enabled ? 'two_factor_enabled' : 'two_factor_disabled'), style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 14), if (!enabled) FilledButton.icon(onPressed: working ? null : setup, icon: const Icon(Icons.qr_code_2_outlined), label: Text(localizedProfileText(context, 'two_factor_setup'))), if (secret != null) ...[const SizedBox(height: 14), SelectableText(secret!, style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2)), const SizedBox(height: 14)], if (secret != null || enabled) TextField(controller: code, keyboardType: TextInputType.number, maxLength: 6, decoration: InputDecoration(labelText: localizedProfileText(context, 'two_factor_code'), border: const OutlineInputBorder())), if (secret != null) Padding(padding: const EdgeInsets.only(top: 12), child: FilledButton(onPressed: working ? null : confirm, child: Text(localizedProfileText(context, 'two_factor_confirm')))), if (enabled) Padding(padding: const EdgeInsets.only(top: 12), child: OutlinedButton(onPressed: working ? null : disable, child: Text(localizedProfileText(context, 'two_factor_disable'))))]);
 }
 
 class PrivacyConsentPage extends StatefulWidget {
@@ -1119,17 +1098,7 @@ class _PrivacyConsentPageState extends State<PrivacyConsentPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedProfileText(context, 'privacy_consent'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        SwitchListTile(title: Text(localizedProfileText(context, 'terms')), value: values['terms_of_service'] == true, onChanged: (value) => update('terms_of_service', value)),
-        SwitchListTile(title: Text(localizedProfileText(context, 'policy')), value: values['privacy_policy'] == true, onChanged: (value) => update('privacy_policy', value)),
-        SwitchListTile(title: Text(localizedProfileText(context, 'marketing')), value: values['marketing'] == true, onChanged: (value) => update('marketing', value)),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedProfileText(context, 'privacy_consent'))), body: loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(20), children: [if (error != null) Text(error!, style: const TextStyle(color: Colors.red)), Text(localizedProfileText(context, 'consent_summary'), style: const TextStyle(color: Colors.grey)), const SizedBox(height: 14), SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(localizedProfileText(context, 'terms')), subtitle: Text(localizedProfileText(context, 'terms_hint')), value: values['terms_of_service'] == true, onChanged: (value) => update('terms_of_service', value)), SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(localizedProfileText(context, 'policy')), subtitle: Text(localizedProfileText(context, 'policy_hint')), value: values['privacy_policy'] == true, onChanged: (value) => update('privacy_policy', value)), SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(localizedProfileText(context, 'marketing')), subtitle: Text(localizedProfileText(context, 'marketing_hint')), value: values['marketing'] == true, onChanged: (value) => update('marketing', value))]));
 }
 
 class AddressPage extends StatefulWidget {
@@ -1171,16 +1140,7 @@ class _AddressPageState extends State<AddressPage> {
   Future<void> remove(int id) async { if (deletingIds.contains(id)) return; deletingIds.add(id); try { await widget.session.api.deleteAddress(id, idempotencyKey: 'mobile-address-delete-$id'); await load(); } catch (exception) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(exception.toString()), action: SnackBarAction(label: localizedWorkflowAction(context, 'Retry'), onPressed: () => remove(id)))); } finally { deletingIds.remove(id); } }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedProfileText(context, 'address_title'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        return ListTile(title: Text('${row['label'] ?? localizedProfileText(context, 'address')}'), subtitle: Text('${row['address_line'] ?? ''}'));
-      },
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedProfileText(context, 'address_title')), actions: [IconButton(onPressed: addAddress, icon: const Icon(Icons.add_location_alt_outlined))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : rows.isEmpty ? Center(child: Text(localizedProfileText(context, 'no_addresses'))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: rows.length, itemBuilder: (context, index) { final row = rows[index]; return Card(child: ListTile(title: Text('${row['label'] ?? localizedProfileText(context, 'address')}'), subtitle: Text('${row['address_line'] ?? ''}${row['city'] == null ? '' : ', ${row['city']}'}'), leading: row['is_default'] == true ? const Icon(Icons.star, color: Colors.amber) : const Icon(Icons.location_on_outlined), trailing: IconButton(onPressed: () => remove(int.parse('${row['id']}')), icon: const Icon(Icons.delete_outline)))); }));
 }
 
 class VerificationDocumentsPage extends StatefulWidget {
@@ -1260,7 +1220,7 @@ class _SupportPageState extends State<SupportPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedOperationsText(context, 'support')), actions: [IconButton(onPressed: create, icon: const Icon(Icons.add_comment_outlined))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : rows.isEmpty ? Center(child: Text(localizedOperationsText(context, 'no_support'))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: rows.length, itemBuilder: (context, index) { final row = rows[index]; return Card(child: ListTile(title: Text('${row['subject'] ?? localizedOperationsText(context, 'support')}'), subtitle: Text('${row['status'] ?? 'open'} · ${row['description'] ?? ''}'))); }));
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedOperationsText(context, 'support')), actions: [IconButton(onPressed: create, icon: const Icon(Icons.add_comment_outlined))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : rows.isEmpty ? Center(child: Text(localizedOperationsText(context, 'no_support'))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: rows.length, itemBuilder: (context, index) { final row = rows[index]; return Card(child: ListTile(title: Text('${row['subject'] ?? localizedOperationsText(context, 'support')}'), subtitle: Text('${row['status'] ?? 'open'} Â· ${row['description'] ?? ''}'))); }));
 }
 
 class NotificationPreferencesPage extends StatefulWidget {
@@ -1293,22 +1253,7 @@ class _NotificationPreferencesPageState extends State<NotificationPreferencesPag
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedProfileText(context, 'notification_preferences'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
-        Text(localizedProfileText(context, 'notification_channels')),
-        ...{'in_app_enabled': 'in_app', 'push_enabled': 'push', 'email_enabled': 'email_notifications', 'sms_enabled': 'sms'}.entries.map((entry) => SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(localizedProfileText(context, entry.value)),
-          value: preferences[entry.key] == true,
-          onChanged: (value) => save(entry.key, value),
-        )),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedProfileText(context, 'notification_preferences')), body: loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(20), children: [if (error != null) Text(error!, style: const TextStyle(color: Colors.red)), Text(localizedProfileText(context, 'notification_channels')), const SizedBox(height: 12), ...{'in_app_enabled': 'in_app', 'push_enabled': 'push', 'email_enabled': 'email_notifications', 'sms_enabled': 'sms'}.entries.map((entry) => SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(localizedProfileText(context, entry.value)), value: preferences[entry.key] == true, onChanged: (value) => save(entry.key, value)))])));
 }
 
 class SubscriptionPage extends StatefulWidget {
@@ -1376,30 +1321,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
   }
 
   @override
-  /*
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedCatalogText(context, 'annual_subscription')), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh_rounded))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView(padding: const EdgeInsets.all(20), children: [Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(localizedCatalogText(context, 'current_status'), style: const TextStyle(color: Colors.grey)), const SizedBox(height: 8), Text('${subscription?['status'] ?? localizedCatalogText(context, 'not_active')}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)), if (subscription?['ends_at'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${localizedCatalogText(context, 'valid_until')} ${subscription?['ends_at']}')), if (plan?['code'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${localizedCatalogText(context, 'plan')}: ${plan?['code']} · ${plan?['amount'] ?? localizedCatalogText(context, 'contact_admin')}'))])), const SizedBox(height: 18), Text(localizedCatalogText(context, 'payment_receipt_hint'), style: const TextStyle(color: Colors.grey)), const SizedBox(height: 14), FilledButton.icon(onPressed: uploadProof, icon: const Icon(Icons.upload_file_rounded), label: Text(localizedCatalogText(context, 'submit_payment_proof'))]);
-}
-
-  */
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedCatalogText(context, 'annual_subscription'))),
-    body: loading
-        ? const Center(child: CircularProgressIndicator())
-        : error != null
-            ? Center(child: Text(error!))
-            : ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Text('${subscription?['status'] ?? localizedCatalogText(context, 'not_active')}'),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: uploadProof,
-                    icon: const Icon(Icons.upload_file_rounded),
-                    label: Text(localizedCatalogText(context, 'submit_payment_proof')),
-                  ),
-                ],
-              ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedCatalogText(context, 'annual_subscription')), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh_rounded))]), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView(padding: const EdgeInsets.all(20), children: [Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(localizedCatalogText(context, 'current_status'), style: const TextStyle(color: Colors.grey)), const SizedBox(height: 8), Text('${subscription?['status'] ?? localizedCatalogText(context, 'not_active')}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)), if (subscription?['ends_at'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${localizedCatalogText(context, 'valid_until')} ${subscription?['ends_at']}')), if (plan?['code'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${localizedCatalogText(context, 'plan')}: ${plan?['code']} · ${plan?['amount'] ?? localizedCatalogText(context, 'contact_admin')}'))])), const SizedBox(height: 18), Text(localizedCatalogText(context, 'payment_receipt_hint'), style: const TextStyle(color: Colors.grey)), const SizedBox(height: 14), FilledButton.icon(onPressed: uploadProof, icon: const Icon(Icons.upload_file_rounded), label: Text(localizedCatalogText(context, 'submit_payment_proof'))]))));
 }
 
 class PartnerInventoryPage extends StatefulWidget {
@@ -1455,18 +1377,7 @@ class _PartnerInventoryPageState extends State<PartnerInventoryPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedCatalogText(context, 'inventory'))),
-    floatingActionButton: FloatingActionButton.extended(onPressed: editInventory, icon: const Icon(Icons.add_rounded), label: Text(localizedCatalogText(context, 'adjust_stock'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        return Card(child: ListTile(title: Text('${row['name_en'] ?? 'Medicine'}'), subtitle: Text('${row['quantity'] ?? 0} available')));
-      },
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedCatalogText(context, 'inventory')), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh_rounded))]), floatingActionButton: FloatingActionButton.extended(onPressed: editInventory, icon: const Icon(Icons.add_rounded), label: Text(localizedCatalogText(context, 'adjust_stock'))), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : rows.isEmpty ? Center(child: Text(localizedCatalogText(context, 'no_inventory'))) : RefreshIndicator(onRefresh: load, child: ListView.builder(padding: const EdgeInsets.all(16), itemCount: rows.length, itemBuilder: (context, index) { final row = rows[index]; return Card(elevation: 0, child: ListTile(title: Text('${row['name_en'] ?? 'Medicine'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${row['name_ar'] ?? ''}'), trailing: Text('${row['quantity'] ?? 0} available\n${row['reserved_quantity'] ?? 0} reserved', textAlign: TextAlign.right)); })))));
 }
 
 class ProcurementCreatePage extends StatefulWidget {
@@ -1500,7 +1411,7 @@ class _ProcurementCreatePageState extends State<ProcurementCreatePage> {
       if (warehouses.isEmpty) throw const ApiException(404, 'No approved warehouse is available.');
       await widget.session.api.createProcurement({'warehouse_id': warehouses.first['id'], 'delivery_address_snapshot': address.text.trim(), 'items': [{'medicine_id': id, 'quantity': qty}]}, idempotencyKey: idempotencyKey);
       idempotencyKey = null;
-      if (mounted) setState(() => message = '${localizedOperationsText(context, 'submit_request')} ✓');
+      if (mounted) setState(() => message = '${localizedOperationsText(context, 'submit_request')} âœ“');
     } catch (exception) {
       if (mounted) setState(() => message = exception.toString());
     } finally {
@@ -1555,13 +1466,7 @@ class _DriverAvailabilityPageState extends State<DriverAvailabilityPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(localizedDashboardText(context, 'driver_availability'))),
-    body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView(
-      padding: const EdgeInsets.all(20),
-      children: [Card(child: SwitchListTile(title: Text(localizedDashboardText(context, 'available_jobs')), value: available, onChanged: approval == 'approved' ? update : null))],
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(localizedDashboardText(context, 'driver_availability'))), body: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: Text(error!)) : ListView(padding: const EdgeInsets.all(20), children: [Card(elevation: 0, child: SwitchListTile(title: Text(localizedDashboardText(context, 'available_jobs')), subtitle: Text(approval == 'approved' ? localizedDashboardText(context, 'approved_driver') : '${localizedDashboardText(context, 'approval_status')}: ${localizedStatus(context, approval)}'), value: available, onChanged: approval == 'approved' ? update : null))]));
 }
 
 class RoleOperationsPage extends StatefulWidget {
@@ -1760,7 +1665,7 @@ class _RoleOperationsPageState extends State<RoleOperationsPage> {
   Future<void> rateCompletedOrder(int orderId) async {
     var score = 5;
     final comment = TextEditingController();
-    final submit = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(localizedOperationsText(context, 'rate_order')), content: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButtonFormField<int>(initialValue: score, items: [1, 2, 3, 4, 5].map((value) => DropdownMenuItem(value: value, child: Text('$value / 5'))).toList(), onChanged: (value) => score = value ?? 5), TextField(controller: comment, maxLines: 3, decoration: InputDecoration(labelText: localizedOperationsText(context, 'comment')))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(localizedOperationsText(context, 'cancel'))), FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(localizedOperationsText(context, 'submit')))]));
+    final submit = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(localizedOperationsText(context, 'rate_order')), content: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButtonFormField<int>(value: score, items: [1, 2, 3, 4, 5].map((value) => DropdownMenuItem(value: value, child: Text('$value / 5'))).toList(), onChanged: (value) => score = value ?? 5), TextField(controller: comment, maxLines: 3, decoration: InputDecoration(labelText: localizedOperationsText(context, 'comment')))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(localizedOperationsText(context, 'cancel'))), FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(localizedOperationsText(context, 'submit')))]));
     if (submit != true) { comment.dispose(); return; }
     final operation = 'rating:$orderId';
     if (!beginOperation(operation)) { comment.dispose(); return; }
@@ -1856,7 +1761,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Future<void> rateOrder() async {
     var score = 5;
     final comment = TextEditingController();
-    final submit = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(localizedOrderText(context, 'rate')), content: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButtonFormField<int>(initialValue: score, items: [1, 2, 3, 4, 5].map((value) => DropdownMenuItem(value: value, child: Text('$value / 5'))).toList(), onChanged: (value) => score = value ?? 5), TextField(controller: comment, maxLines: 3, decoration: InputDecoration(labelText: localizedOperationsText(context, 'comment')))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(localizedOperationsText(context, 'cancel'))), FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(localizedOperationsText(context, 'submit')))]));
+    final submit = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(localizedOrderText(context, 'rate')), content: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButtonFormField<int>(value: score, items: [1, 2, 3, 4, 5].map((value) => DropdownMenuItem(value: value, child: Text('$value / 5'))).toList(), onChanged: (value) => score = value ?? 5), TextField(controller: comment, maxLines: 3, decoration: InputDecoration(labelText: localizedOperationsText(context, 'comment')))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(localizedOperationsText(context, 'cancel'))), FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(localizedOperationsText(context, 'submit')))]));
     if (submit != true) { comment.dispose(); return; }
     try {
       await widget.session.api.rateOrder(widget.orderId, score, comment: comment.text.trim(), idempotencyKey: 'mobile-rating-${widget.orderId}');
@@ -1875,7 +1780,6 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final timeline = (payload?['timeline'] as List?)?.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList() ?? [];
     final delivery = (payload?['delivery'] as Map?)?.cast<String, dynamic>();
     final rating = (payload?['rating'] as Map?)?.cast<String, dynamic>();
-    // ignore: use_build_context_synchronously
     return Scaffold(appBar: AppBar(title: Text(localizedOrderText(context, 'details'))), body: error != null ? Center(child: Text(error!)) : order == null ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(20), children: [Text('Order ${order['public_id'] ?? order['id']}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)), const SizedBox(height: 8), Text(localizedStatus(context, '${order['status'] ?? 'unknown'}'), style: const TextStyle(color: Color(0xff1689b8), fontWeight: FontWeight.w700)), if (order['status'] == 'completed' && rating == null) Padding(padding: const EdgeInsets.only(top: 16), child: OutlinedButton.icon(onPressed: rateOrder, icon: const Icon(Icons.star_outline_rounded), label: Text(localizedOrderText(context, 'rate')))), if (rating != null) Padding(padding: const EdgeInsets.only(top: 16), child: Card(elevation: 0, child: ListTile(leading: const Icon(Icons.star_rounded, color: Colors.amber), title: Text('${localizedOrderText(context, 'your_rating')}: ${rating['score'] ?? '-'}/5'), subtitle: Text('${rating['comment'] ?? localizedOrderText(context, 'thank_you')}')))), if (delivery?['last_latitude'] != null && delivery?['last_longitude'] != null && delivery?['status'] != 'delivered') Padding(padding: const EdgeInsets.only(top: 16), child: Card(color: const Color(0xffe8f5fa), elevation: 0, child: ListTile(leading: const Icon(Icons.location_on_outlined, color: Color(0xff1689b8)), title: Text(localizedOrderText(context, 'driver_location'), style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${localizedOrderText(context, 'location_updated')}: ${delivery?['location_updated_at'] ?? '-'}'), trailing: IconButton(onPressed: () async { final uri = Uri.https('www.openstreetmap.org', '/', {'mlat': '${delivery?['last_latitude']}', 'mlon': '${delivery?['last_longitude']}', 'zoom': '15'}); if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(localizedOrderText(context, 'map_unavailable')))); }, icon: const Icon(Icons.map_outlined), tooltip: localizedOrderText(context, 'open_map'))))), if (delivery?['delivery_pin'] != null) Padding(padding: const EdgeInsets.only(top: 16), child: Card(color: const Color(0xffe8f5fa), elevation: 0, child: ListTile(leading: const Icon(Icons.pin_outlined, color: Color(0xff1689b8)), title: Text(localizedOrderText(context, 'delivery_pin'), style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${delivery?['delivery_pin']}', style: const TextStyle(fontSize: 24, letterSpacing: 4, fontWeight: FontWeight.w800))))), const SizedBox(height: 18), Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(localizedOrderText(context, 'invoice'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), const SizedBox(height: 10), Text('${localizedOrderText(context, 'subtotal')}: ${invoice?['subtotal'] ?? order['subtotal'] ?? '0.00'}'), Text('${localizedOrderText(context, 'delivery_fee')}: ${invoice?['delivery_fee'] ?? order['delivery_fee'] ?? '0.00'}'), const Divider(), Text('${localizedOrderText(context, 'total')}: ${invoice?['total'] ?? order['total'] ?? '0.00'}', style: const TextStyle(fontWeight: FontWeight.w800)), Text('${localizedOrderText(context, 'payment')}: ${invoice?['payment_method'] ?? order['payment_method'] ?? 'cash_on_delivery'}')]))), if (timeline.isNotEmpty) ...[const SizedBox(height: 18), Text(localizedOrderText(context, 'timeline'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), const SizedBox(height: 8), ...timeline.map((event) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.check_circle_outline, color: Color(0xff1689b8)), title: Text(localizedStatus(context, '${event['to_status'] ?? 'updated'}')), subtitle: Text('${event['created_at'] ?? ''}')))], if (timeline.isEmpty) Padding(padding: const EdgeInsets.only(top: 18), child: Text(localizedOrderText(context, 'timeline_empty'), style: const TextStyle(color: Colors.grey))) ]));
   }
 }
@@ -1895,25 +1799,34 @@ class _RoleActions extends StatelessWidget {
       'admin' => const [('Admin dashboard', Icons.dashboard_customize_outlined), ('Security', Icons.security_outlined), ('Notifications', Icons.notifications_none_rounded)],
       _ => const [('Available jobs', Icons.local_shipping_rounded), ('My deliveries', Icons.route_rounded), ('Availability', Icons.toggle_on_rounded)],
     };
-    return Row(
-      children: actions.map<Widget>((action) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: InkWell(
-            onTap: () => onTap(action.$1),
-            borderRadius: BorderRadius.circular(14),
-            child: Card(
-              elevation: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(children: [Icon(action.$2), const SizedBox(height: 8), Text(localizedAction(context, action.$1), textAlign: TextAlign.center)]),
+    return Semantics(
+      container: true,
+      label: '${localizedRole(context, role)} actions',
+      child: Row(
+        children: actions.map<Widget>((action) => Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () => onTap(action.$1),
+              borderRadius: BorderRadius.circular(14),
+              child: Card(
+                elevation: 0,
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(children: [
+                    Icon(action.$2, color: const Color(0xff1689b8)),
+                    const SizedBox(height: 8),
+                    Text(localizedAction(context, action.$1), textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xff34586d))),
+                  ]),
+                ),
               ),
             ),
           ),
-        ),
-      )).toList(),
+        )).toList(),
+      ),
     );
   }
 }
 class _EmptyCard extends StatelessWidget { const _EmptyCard({required this.role}); final String role; @override Widget build(BuildContext context) => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(22), child: Column(children: [const Icon(Icons.space_dashboard_outlined, size: 36, color: Color(0xff1689b8)), const SizedBox(height: 10), Text(role == 'patient' ? localizedDashboardText(context, 'search_begin') : localizedDashboardText(context, 'assigned_work'), textAlign: TextAlign.center, style: const TextStyle(color: Color(0xff7892a1)))]))); }
-class _MedicineTile extends StatelessWidget { const _MedicineTile({required this.medicine, this.onTap}); final Map<String, dynamic> medicine; final VoidCallback? onTap; @override Widget build(BuildContext context) => Card(elevation: 0, child: ListTile(onTap: onTap, leading: const CircleAvatar(backgroundColor: Color(0xffe8f5fa), child: Text('Rx', style: TextStyle(color: Color(0xff117eaa), fontWeight: FontWeight.w800))), title: Text('${medicine['name_en'] ?? 'Medicine'}', style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${medicine['name_ar'] ?? ''} · ${medicine['manufacturer'] ?? ''}'), trailing: const Icon(Icons.chevron_right_rounded))); }
+class _MedicineTile extends StatelessWidget { const _MedicineTile({required this.medicine, this.onTap}); final Map<String, dynamic> medicine; final VoidCallback? onTap; @override Widget build(BuildContext context) => Card(elevation: 0, child: ListTile(onTap: onTap, leading: const CircleAvatar(backgroundColor: Color(0xffe8f5fa), child: Text('Rx', style: TextStyle(color: Color(0xff117eaa), fontWeight: FontWeight.w800))), title: Text('${medicine['name_en'] ?? 'Medicine'}', style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${medicine['name_ar'] ?? ''} Â· ${medicine['manufacturer'] ?? ''}'), trailing: const Icon(Icons.chevron_right_rounded))); }

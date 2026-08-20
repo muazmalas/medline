@@ -339,7 +339,7 @@ class ApiClient {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         response = await _withAuthRecovery(send, allowRecovery: notifyUnauthorized);
       } on ApiException catch (retryException) {
-        if (allowQueue && idempotencyKey != null && retryException.statusCode == 0) return _queueMutation('POST', path, body, idempotencyKey);
+        if (allowQueue && retryException.statusCode == 0) return _queueMutation('POST', path, body, idempotencyKey);
         rethrow;
       }
     }
@@ -357,7 +357,7 @@ class ApiClient {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         response = await _withAuthRecovery(send);
       } on ApiException catch (retryException) {
-        if (allowQueue && idempotencyKey != null && retryException.statusCode == 0) return _queueMutation('DELETE', path, body, idempotencyKey);
+        if (allowQueue && retryException.statusCode == 0) return _queueMutation('DELETE', path, body, idempotencyKey);
         rethrow;
       }
     }
@@ -388,7 +388,7 @@ class ApiClient {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         response = await _withAuthRecovery(send);
       } on ApiException catch (retryException) {
-        if (queueIfOffline && idempotencyKey != null && retryException.statusCode == 0) return _queueMutation('PATCH', path, body, idempotencyKey);
+        if (queueIfOffline && retryException.statusCode == 0) return _queueMutation('PATCH', path, body, idempotencyKey);
         rethrow;
       }
     }

@@ -5,7 +5,11 @@ import 'package:medline_mobile/features/orders/order_status.dart';
 
 void main() {
   testWidgets('order timeline marks completed stages and keeps future stages visible', (tester) async {
-    await tester.pumpWidget(const MaterialApp(child: OrderStatusTimeline(status: 'in_transit')));
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(child: OrderStatusTimeline(status: 'in_transit')),
+      ),
+    ));
 
     expect(find.text('pending pharmacy review'), findsOneWidget);
     expect(find.text('in transit'), findsOneWidget);
@@ -18,7 +22,7 @@ void main() {
     var claimed = false;
     await tester.pumpWidget(MaterialApp(
       home: DriverDeliveryCard(
-        delivery: {'order_public_id': 'ORD-100', 'total': 1250, 'delivery_address_snapshot': 'Damascus'},
+        delivery: const {'order_public_id': 'ORD-100', 'total': 1250, 'delivery_address_snapshot': 'Damascus'},
         onClaim: () => claimed = true,
       ),
     ));
