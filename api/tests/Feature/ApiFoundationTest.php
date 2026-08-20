@@ -22,7 +22,7 @@ class ApiFoundationTest extends TestCase
             ->assertJsonPath('service', 'medline-api');
     }
 
-    public function test_patient_can_register_and_receive_token(): void
+    public function test_patient_can_register_and_wait_for_administrator_approval(): void
     {
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'Test Patient',
@@ -34,7 +34,8 @@ class ApiFoundationTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('user.role', 'patient')
-            ->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'role']]);
+            ->assertJsonMissingPath('token')
+            ->assertJsonStructure(['message', 'user' => ['id', 'name', 'email', 'role']]);
     }
 
     public function test_medicine_search_matches_english_and_arabic_names(): void

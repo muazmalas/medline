@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import axios from 'axios'
-import { Bell, ChevronRight, ClipboardList, CreditCard, Eye, FileCheck2, FileX2, History, LayoutDashboard, LogOut, Menu, MessageSquare, Package, Search, Settings, ShieldCheck, Truck, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Bell, ChevronDown, ChevronRight, ClipboardList, CreditCard, Eye, FileCheck2, FileX2, History, LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Package, Plus, Search, Settings, ShieldCheck, ShoppingCart, Trash2, Truck, UserRound, Users, X } from 'lucide-react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { translate as tr } from './i18n'
@@ -100,23 +100,24 @@ api.interceptors.response.use((response) => response, async (error) => {
 
 function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(localStorage.getItem('medline_token')))
-  const [role, setRole] = useState(() => { try { return JSON.parse(localStorage.getItem('medline_user') ?? '{}').role ?? 'admin' } catch { return 'admin' } })
+  const [currentUser, setCurrentUser] = useState<Record<string, unknown>>(() => { try { return JSON.parse(localStorage.getItem('medline_user') ?? '{}') } catch { return {} } })
+  const [role, setRole] = useState(() => String(currentUser.role ?? 'admin'))
   const [sessionReady, setSessionReady] = useState(!localStorage.getItem('medline_token'))
   const [locale, setLocale] = useState(() => localStorage.getItem('medline_locale_explicit') === 'true' ? (localStorage.getItem('medline_locale') ?? 'en') : 'en')
   const [section, setSection] = useState(() => sectionFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const requiresSubscription = role === 'pharmacy' || role === 'warehouse'
-  const [subscriptionActive, setSubscriptionActive] = useState(role === 'admin' || !requiresSubscription)
+  const [subscriptionActive, setSubscriptionActive] = useState<boolean | null>(role === 'admin' || !requiresSubscription ? true : null)
   useEffect(() => {
     const handleUnauthorized = () => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }
     window.addEventListener('medline:unauthorized', handleUnauthorized)
     return () => window.removeEventListener('medline:unauthorized', handleUnauthorized)
   }, [])
-  useEffect(() => { if (!authenticated) { setSessionReady(true); return } setSessionReady(false); api.get('/auth/me').then((response) => { const user = response.data.user ?? {}; localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin') }).catch(() => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }).finally(() => setSessionReady(true)) }, [authenticated])
+  useEffect(() => { if (!authenticated) { setSessionReady(true); return } setSessionReady(false); api.get('/auth/me').then((response) => { const user = response.data.user ?? {}; localStorage.setItem('medline_user', JSON.stringify(user)); setCurrentUser(user); setRole(user.role ?? 'admin') }).catch(() => { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) }).finally(() => setSessionReady(true)) }, [authenticated])
   useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('medline_locale', locale); localStorage.setItem('medline_locale_explicit', 'true') }, [locale])
-  useEffect(() => { if (!authenticated || role === 'admin' || !requiresSubscription) { setSubscriptionActive(true); return } setSubscriptionActive(false); api.get('/subscription').then((response) => setSubscriptionActive(['active', 'grace'].includes(String(response.data.subscription?.status ?? '')))).catch(() => setSubscriptionActive(false)) }, [authenticated, role, requiresSubscription])
+  useEffect(() => { if (!authenticated || role === 'admin' || !requiresSubscription) { setSubscriptionActive(true); return } if (!sessionReady) return; let cancelled = false; setSubscriptionActive(null); api.get('/subscription').then((response) => { if (!cancelled) setSubscriptionActive(Boolean(response.data.access_active ?? ['active', 'expiring_soon', 'grace'].includes(String(response.data.active_subscription?.status ?? response.data.subscription?.status ?? '')))) }).catch(() => { if (!cancelled) setSubscriptionActive(false) }); return () => { cancelled = true } }, [authenticated, role, requiresSubscription, sessionReady])
   useEffect(() => { const handleRoute = () => setSection(sectionFromPath(window.location.pathname)); window.addEventListener('popstate', handleRoute); return () => window.removeEventListener('popstate', handleRoute) }, [])
-  useEffect(() => { if (authenticated && role === 'patient' && !['orders', 'deliveries', 'settings', 'notifications'].includes(section)) { window.history.replaceState({}, '', '/orders'); setSection('orders') } }, [authenticated, role, section])
+  useEffect(() => { if (authenticated && role === 'patient' && !['orders', 'new-order', 'deliveries', 'settings', 'notifications', 'profile', 'medicine-detail'].includes(section)) { window.history.replaceState({}, '', '/orders'); setSection('orders') } }, [authenticated, role, section])
   useEffect(() => { const openMetric = (event: Event) => { const target = event.target as HTMLElement; const card = target.closest('.metric-card'); if (!card) return; const label = card.querySelector('.metric-copy span')?.textContent ?? ''; const destination = label.includes('orders') ? '/orders' : label.includes('verification') ? '/verification' : label.includes('delivery') ? '/deliveries' : label.includes('organization') ? '/pharmacies' : ''; if (destination) { window.history.pushState({}, '', destination); window.dispatchEvent(new Event('popstate')) } }; document.addEventListener('click', openMetric); return () => document.removeEventListener('click', openMetric) }, [])
   useEffect(() => {
     if (!authenticated) return
@@ -133,23 +134,23 @@ function App() {
     } catch { /* Realtime is optional; polling remains available if Reverb is stopped. */ }
     return () => { if (echo) echo.disconnect() }
   }, [authenticated])
-  const operationalAccess = role === 'admin' || !requiresSubscription || subscriptionActive
-  useEffect(() => { if (authenticated && requiresSubscription && !operationalAccess && section !== 'subscriptions') { window.history.replaceState({}, '', '/subscriptions'); setSection('subscriptions') } }, [authenticated, requiresSubscription, operationalAccess, section])
-  if (!sessionReady) return <div className="session-loading">Restoring your secure MedLine session...</div>
-  if (!authenticated) return section === 'register' ? <RegistrationPage onBack={() => { window.history.pushState({}, '', '/'); setSection('dashboard') }} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(String(user.role ?? 'patient')); setAuthenticated(true) }} /> : <div className="login-composite"><LoginPage locale={locale} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setRole(user.role ?? 'admin'); setAuthenticated(true) }} /><a className="register-launch" href="/register">Create an account</a></div>
-  const logout = async () => { try { await api.post('/auth/logout', {}) } catch { /* Continue local cleanup if the API is unavailable. */ } finally { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setAuthenticated(false) } }
-  const nav = (value: string) => { if (requiresSubscription && !operationalAccess && value !== 'subscriptions') value = 'subscriptions'; window.history.pushState({}, '', pathForSection(value)); setSection(value); setSidebarOpen(false) }
+  const operationalAccess = role === 'admin' || !requiresSubscription || subscriptionActive === true
+  useEffect(() => { if (authenticated && requiresSubscription && subscriptionActive === false && section !== 'subscriptions') { window.history.replaceState({}, '', '/subscriptions'); setSection('subscriptions') } }, [authenticated, requiresSubscription, subscriptionActive, section])
+  if (!sessionReady || (authenticated && requiresSubscription && subscriptionActive === null)) return <div className="session-loading">Restoring your secure MedLine session...</div>
+  if (!authenticated) return section === 'register' ? <RegistrationPage onBack={() => { window.history.pushState({}, '', '/'); setSection('dashboard') }} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setCurrentUser(user); setRole(String(user.role ?? 'patient')); setAuthenticated(true) }} /> : <div className="login-composite"><LoginPage locale={locale} onAuthenticated={(user) => { localStorage.setItem('medline_user', JSON.stringify(user)); setCurrentUser(user); setRole(String(user.role ?? 'admin')); setAuthenticated(true) }} /><a className="register-launch" href="/register">Create an account</a></div>
+  const logout = async () => { try { await api.post('/auth/logout', {}) } catch { /* Continue local cleanup if the API is unavailable. */ } finally { localStorage.removeItem('medline_token'); localStorage.removeItem('medline_refresh_token'); localStorage.removeItem('medline_user'); setCurrentUser({}); setAuthenticated(false) } }
+  const nav = (value: string) => { if (requiresSubscription && subscriptionActive === false && value !== 'subscriptions') value = 'subscriptions'; window.history.pushState({}, '', pathForSection(value)); setSection(value); setSidebarOpen(false) }
   return <div className="app-shell">
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand"><div className="brand-mark">M</div><div><strong>MedLine</strong><span>Healthcare logistics</span></div></div>
       <nav>
         <p className="nav-label">{tr('workspace', locale)}</p>
         {operationalAccess && <>{role !== 'patient' && <NavItem active={section === 'dashboard'} onClick={() => nav('dashboard')} icon={<LayoutDashboard size={18} />} label={tr('dashboard', locale)} />}
-        {role !== 'warehouse' && <NavItem active={section === 'orders'} onClick={() => nav('orders')} icon={<ClipboardList size={18} />} label={tr('orders', locale)} />}
+        {role !== 'warehouse' && <NavItem active={section === 'orders' || section === 'new-order'} onClick={() => nav('orders')} icon={<ClipboardList size={18} />} label={tr('orders', locale)} />}
         {(role === 'admin' || role === 'pharmacy' || role === 'warehouse') && <><NavItem active={section === 'inventory'} onClick={() => nav('inventory')} icon={<Package size={18} />} label={tr('inventory', locale)} />
         <NavItem active={section === 'procurement'} onClick={() => nav('procurement')} icon={<Package size={18} />} label={tr('procurement', locale)} /></>}
         {(role === 'admin' || role === 'patient' || role === 'driver' || role === 'pharmacy' || role === 'warehouse') && <NavItem active={section === 'deliveries'} onClick={() => nav('deliveries')} icon={<Truck size={18} />} label={tr('deliveries', locale)} />}</>}
-        {requiresSubscription && <NavItem active={section === 'subscriptions'} onClick={() => nav('subscriptions')} icon={<CreditCard size={18} />} label={tr('subscriptions', locale)} />}
+        {(requiresSubscription || role === 'admin') && <NavItem active={section === 'subscriptions'} onClick={() => nav('subscriptions')} icon={<CreditCard size={18} />} label={role === 'admin' ? 'Subscription reviews' : tr('subscriptions', locale)} />}
         {role === 'admin' && <><NavItem active={section === 'complaints'} onClick={() => nav('complaints')} icon={<MessageSquare size={18} />} label={tr('complaints', locale)} /><NavItem active={section === 'ratings'} onClick={() => nav('ratings')} icon={<History size={18} />} label={tr('ratings', locale)} /><NavItem active={section === 'audit'} onClick={() => nav('audit')} icon={<History size={18} />} label={tr('audit', locale)} /></>}
         {role === 'admin' && <><p className="nav-label">{tr('management', locale)}</p>
         <NavItem active={section === 'pharmacies'} onClick={() => nav('pharmacies')} icon={<Users size={18} />} label="Pharmacies" />
@@ -165,16 +166,56 @@ function App() {
     <main className="main-content">
       {(role === 'pharmacy' || role === 'warehouse') && <PartnerAccessGuard role={role} onOpen={() => nav('subscriptions')} />}
       {role === 'pharmacy' && <ProcurementCreatePanel section={section} />}
-      <header className="topbar"><button className="icon-button menu-button" aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}><Menu size={22} /></button><div className="breadcrumb"><span>{tr('workspace', locale)}</span><ChevronRight size={15} /><strong>{tr(section, locale) || title(section)}</strong></div><div className="top-actions"><WebNotifications locale={locale} onOpenAll={() => nav('notifications')} /><div className="top-avatar" aria-label="Signed-in user">MA</div></div></header>
-      {section === 'dashboard' ? <><LiveDashboard role={role} locale={locale} /><DashboardAlerts role={role} locale={locale} /><NotificationHealthPanel role={role} locale={locale} /></> : section === 'notifications' ? <NotificationsPage locale={locale} /> : section === 'subscriptions' && (role === 'pharmacy' || role === 'warehouse') ? <PartnerSubscriptionPage locale={locale} /> : section === 'settings' ? <>{role === 'admin' ? <><SettingsPage role="patient" locale={locale} onLocaleChange={setLocale} /><AdminTwoFactorPanel locale={locale} /></> : <SettingsPage role={role} locale={locale} onLocaleChange={setLocale} />}<ConsentSettings /></> : section === 'inventory/categories' && role === 'admin' ? <><InventoryBackLink /><MedicineCategoryAdmin locale={locale} /></> : section === 'inventory' && role === 'admin' ? <><InventoryCategoryLink /><MedicineAdminPage locale={locale} /><MedicineEditAdminPage locale={locale} /></> : (section === 'pharmacies' || section === 'warehouses') && role === 'admin' ? <PartnerManagementPanel section={section} /> : section === 'users' && role === 'admin' ? <UserRolePanelWithCompany section={section} /> : <OperationsPage section={section} role={role} locale={locale} />}
+      <header className="topbar"><button className="icon-button menu-button" aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}><Menu size={22} /></button><div className="breadcrumb"><span>{tr('workspace', locale)}</span><ChevronRight size={15} /><strong>{section === 'medicine-detail' ? 'Medicine details' : section === 'new-order' ? 'Create order' : tr(section, locale) || title(section)}</strong></div><div className="top-actions"><WebNotifications locale={locale} onOpenAll={() => nav('notifications')} /><AccountMenu user={currentUser} onProfile={() => nav('profile')} onLogout={() => void logout()} /></div></header>
+      {section === 'new-order' && role === 'patient' ? <NewOrderPage locale={locale} onBack={() => nav('orders')} /> : section === 'medicine-detail' ? <MedicineDetailPage medicineId={Number(window.location.pathname.split('/').pop())} onBack={() => { window.history.back(); window.setTimeout(() => { if (sectionFromPath(window.location.pathname) === 'medicine-detail') nav('dashboard') }, 50) }} locale={locale} /> : section === 'profile' ? <ProfilePage user={currentUser} onUpdated={(user) => { setCurrentUser(user); localStorage.setItem('medline_user', JSON.stringify(user)) }} /> : section === 'dashboard' ? <><LiveDashboard role={role} locale={locale} /><DashboardAlerts role={role} locale={locale} /><NotificationHealthPanel role={role} locale={locale} /></> : section === 'notifications' ? <NotificationsPage locale={locale} /> : section === 'subscriptions' && (role === 'pharmacy' || role === 'warehouse') ? <PartnerSubscriptionPage locale={locale} /> : section === 'subscriptions' && role === 'admin' ? <AdminSubscriptionReviewPage locale={locale} /> : section === 'settings' ? <>{role === 'admin' ? <><SettingsPage role="patient" locale={locale} onLocaleChange={setLocale} /><AdminTwoFactorPanel locale={locale} /></> : <SettingsPage role={role} locale={locale} onLocaleChange={setLocale} />}<ConsentSettings /></> : section === 'inventory/categories' && role === 'admin' ? <><InventoryBackLink /><MedicineCategoryAdmin locale={locale} /></> : section === 'inventory' && role === 'admin' ? <><InventoryCategoryLink /><MedicineAdminPage locale={locale} /><MedicineEditAdminPage locale={locale} /></> : (section === 'pharmacies' || section === 'warehouses') && role === 'admin' ? <PartnerManagementPanel section={section} /> : section === 'users' && role === 'admin' ? <UserRolePanelWithCompany section={section} /> : <OperationsPage section={section} role={role} locale={locale} />}
     </main>
   </div>
 }
 
 function NavItem({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: ReactNode; label: string; badge?: string }) { return <button type="button" className={active ? 'active' : ''} onClick={onClick} aria-current={active ? 'page' : undefined}>{icon}<span>{label}</span>{badge && <b>{badge}</b>}</button> }
 function title(value: string) { return value.charAt(0).toUpperCase() + value.slice(1) }
-function pathForSection(section: string): string { return section === 'dashboard' ? '/' : `/${section}` }
-function sectionFromPath(pathname: string): string { const path = pathname.replace(/^\/+|\/+$/g, ''); return path || 'dashboard' }
+function pathForSection(section: string): string { return section === 'dashboard' ? '/' : section === 'new-order' ? '/orders/new' : `/${section}` }
+function sectionFromPath(pathname: string): string { const path = pathname.replace(/^\/+|\/+$/g, ''); if (path === 'orders/new') return 'new-order'; if (/^medicines\/\d+$/.test(path)) return 'medicine-detail'; return path || 'dashboard' }
+function openMedicineDetail(id: number) { window.history.pushState({}, '', `/medicines/${id}`); window.dispatchEvent(new PopStateEvent('popstate')) }
+
+export function AccountMenu({ user, onProfile, onLogout }: { user: Record<string, unknown>; onProfile: () => void; onLogout: () => void }) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const firstItem = useRef<HTMLButtonElement>(null)
+  const name = String(user.name ?? 'MedLine user')
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'MU'
+  useEffect(() => {
+    const closeOutside = (event: globalThis.MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
+    const handleMenuKeys = (event: KeyboardEvent) => {
+      const menu = root.current?.querySelector<HTMLElement>('[role="menu"]')
+      if (!menu) return
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false); root.current?.querySelector<HTMLButtonElement>('.account-menu-trigger')?.focus(); return }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+      event.preventDefault()
+      const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+      const current = items.indexOf(document.activeElement as HTMLButtonElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (current + 1) % items.length : (current <= 0 ? items.length : current) - 1
+      items[next]?.focus()
+    }
+    document.addEventListener('mousedown', closeOutside)
+    document.addEventListener('keydown', handleMenuKeys)
+    return () => { document.removeEventListener('mousedown', closeOutside); document.removeEventListener('keydown', handleMenuKeys) }
+  }, [])
+  useEffect(() => { if (open) firstItem.current?.focus() }, [open])
+  return <div className="account-menu" ref={root}><button type="button" className="account-menu-trigger" aria-label="Open user menu" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}><span className="top-avatar">{initials}</span><ChevronDown size={15} aria-hidden="true" /></button>{open && <div className="account-menu-popover" role="menu"><div className="account-menu-identity"><span className="top-avatar">{initials}</span><div><strong>{name}</strong><small>{String(user.email ?? '')}</small></div></div><button ref={firstItem} type="button" role="menuitem" onClick={() => { setOpen(false); onProfile() }}><UserRound size={17} /> Profile</button><button type="button" role="menuitem" onClick={() => { setOpen(false); onLogout() }}><LogOut size={17} /> Sign out</button></div>}</div>
+}
+
+export function ProfilePage({ user, onUpdated }: { user: Record<string, unknown>; onUpdated: (user: Record<string, unknown>) => void }) {
+  const [profile, setProfile] = useState({ name: String(user.name ?? ''), phone: String(user.phone ?? '') })
+  const [password, setPassword] = useState({ current_password: '', password: '', password_confirmation: '' })
+  const [profileMessage, setProfileMessage] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => setProfile({ name: String(user.name ?? ''), phone: String(user.phone ?? '') }), [user.name, user.phone])
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); setProfileMessage(''); try { const response = await api.patch('/profile', profile, mutationConfig('profile', 'self', 'update')); onUpdated(response.data.user ?? { ...user, ...profile }); setProfileMessage(response.data.message ?? 'Profile updated.') } catch (error) { setProfileMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to update profile.' : 'Unable to update profile.') } finally { setSaving(false) } }
+  const changePassword = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); setPasswordMessage(''); try { const response = await api.post('/profile/password', password, mutationConfig('profile-password', 'self', uniqueMutationId('change'))); setPasswordMessage(response.data.message ?? 'Password changed.'); setPassword({ current_password: '', password: '', password_confirmation: '' }) } catch (error) { setPasswordMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to change password.' : 'Unable to change password.') } finally { setSaving(false) } }
+  return <section className="content profile-page"><div className="welcome-row"><div><p className="eyebrow">ACCOUNT</p><h1>Your profile</h1><p className="muted">Manage your contact details and account security.</p></div></div><div className="profile-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">PERSONAL DETAILS</p><h2>Profile information</h2></div><UserRound size={22} aria-hidden="true" /></div><form className="profile-form" onSubmit={saveProfile}><label>Full name<input value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} required minLength={2} /></label><label>Email address<input value={String(user.email ?? '')} readOnly aria-readonly="true" /></label><label>Phone number<input type="tel" value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} placeholder="+963..." /></label><button className="primary-button" disabled={saving}>Save profile</button>{profileMessage && <div className="form-message" role="status">{profileMessage}</div>}</form></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h2>Change password</h2></div><LockKeyhole size={22} aria-hidden="true" /></div><form className="profile-form" onSubmit={changePassword}><label>Current password<input type="password" autoComplete="current-password" value={password.current_password} onChange={(event) => setPassword((current) => ({ ...current, current_password: event.target.value }))} required /></label><label>New password<input type="password" autoComplete="new-password" value={password.password} onChange={(event) => setPassword((current) => ({ ...current, password: event.target.value }))} required minLength={8} /><small>Use at least 8 characters and avoid reusing your current password.</small></label><label>Confirm new password<input type="password" autoComplete="new-password" value={password.password_confirmation} onChange={(event) => setPassword((current) => ({ ...current, password_confirmation: event.target.value }))} required minLength={8} /></label><button className="primary-button" disabled={saving || password.password !== password.password_confirmation}>Change password</button>{passwordMessage && <div className="form-message" role="status">{passwordMessage}</div>}</form></section></div></section>
+}
 
 function TablePagination({ page, lastPage, onPageChange }: { page: number; lastPage: number; onPageChange: (page: number) => void }) {
   if (lastPage < 1) return null
@@ -182,6 +223,10 @@ function TablePagination({ page, lastPage, onPageChange }: { page: number; lastP
 }
 function InventoryCategoryLink() { return <div className="inventory-subview-actions"><button type="button" className="ghost-button" onClick={() => { window.history.pushState({}, '', '/inventory/categories'); window.dispatchEvent(new PopStateEvent('popstate')) }}>Manage categories</button></div> }
 function InventoryBackLink() { return <div className="inventory-subview-actions"><button type="button" className="ghost-button" onClick={() => { window.history.pushState({}, '', '/inventory'); window.dispatchEvent(new PopStateEvent('popstate')) }}>Back to inventory</button></div> }
+
+export function humanizeNotificationType(value: unknown): string {
+  return String(value ?? 'MedLine update').replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
 
 async function downloadPrivate(path: string, filename: string) {
   let response
@@ -196,9 +241,10 @@ async function downloadPrivate(path: string, filename: string) {
 }
 
 function NotificationsPage({ locale }: { locale: string }) {
+  void locale
   const [rows, setRows] = useState<NotificationRecord[]>([])
   const [search, setSearch] = useState('')
-  const load = async () => { try { const response = await api.get('/notifications', { params: { per_page: 100 } }); setRows(response.data.data ?? []) } catch { setRows([]) } }
+  const load = async () => { try { const response = await api.get('/notifications', { params: { per_page: 100 } }); setRows((response.data.data ?? []).map((row: NotificationRecord) => ({ ...row, type: humanizeNotificationType(row.type) }))) } catch { setRows([]) } }
   useEffect(() => { void load() }, [])
   const visible = rows.filter((row) => `${row.type ?? ''} ${notificationText(row)}`.toLowerCase().includes(search.toLowerCase()))
   const markRead = async (id: string) => { await api.post(`/notifications/${id}/read`, {}, mutationConfig('notification-read', id, 'read')); await load() }
@@ -210,7 +256,7 @@ export function WebNotifications({ locale, onOpenAll }: { locale: string; onOpen
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<NotificationRecord[]>([])
   const busyNotificationIds = useRef(new Set<string>())
-  const load = async () => { try { const response = await api.get('/notifications', { params: { per_page: 5 } }); setRows(response.data.data ?? []) } catch { setRows([]) } }
+  const load = async () => { try { const response = await api.get('/notifications', { params: { per_page: 5 } }); setRows((response.data.data ?? []).map((row: NotificationRecord) => ({ ...row, type: humanizeNotificationType(row.type) }))) } catch { setRows([]) } }
   useEffect(() => { void load(); const onNotification = () => { void load() }; window.addEventListener('medline:notification', onNotification); const interval = window.setInterval(() => { void load() }, open ? 30000 : 60000); return () => { window.clearInterval(interval); window.removeEventListener('medline:notification', onNotification) } }, [open])
   const toggle = () => { const next = !open; setOpen(next); if (next) void load() }
   const markRead = async (id: string) => { if (busyNotificationIds.current.has(id)) return; busyNotificationIds.current.add(id); try { await api.post(`/notifications/${id}/read`, {}, mutationConfig('notification-read', id, 'read')); await load() } finally { busyNotificationIds.current.delete(id) } }
@@ -238,10 +284,10 @@ export function ConsentSettings() {
   return <section className="content"><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">PRIVACY</p><h2>Consent and policy records</h2></div></div>{[['terms_of_service', 'Terms of service', 'Required to use MedLine.'], ['privacy_policy', 'Privacy policy', 'How MedLine handles account and medical data.'], ['marketing', 'Optional product updates', 'Non-essential MedLine communications.']].map(([key, label, description]) => <label className="setting-row" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" checked={Boolean(consents[key])} onChange={(event) => void update(key, event.target.checked)} /></label>)}{message && <div className="form-success">{message}</div>}</section></section>
 }
 
-export function PartnerAccessGuard({ role, onOpen }: { role: string; onOpen: () => void }) {
+export function PartnerAccessGuard({ role = 'pharmacy', onOpen }: { role?: string; onOpen: () => void }) {
   const [status, setStatus] = useState<string | null>(null)
-  useEffect(() => { api.get('/subscription').then((response) => setStatus(String(response.data.subscription?.status ?? 'inactive'))).catch(() => setStatus('unavailable')) }, [])
-  if (status === null || status === 'active') return null
+  useEffect(() => { api.get('/subscription').then((response) => setStatus(response.data.access_active ? 'active' : String(response.data.review_subscription?.status ?? response.data.subscription?.status ?? 'inactive'))).catch(() => setStatus('unavailable')) }, [])
+  if (status === null || ['active', 'expiring_soon', 'grace'].includes(status)) return null
   const organization = role === 'warehouse' ? 'Warehouse' : 'Pharmacy'
   return <div className="access-banner"><div><strong>{status === 'unavailable' ? 'Subscription status unavailable' : `${organization} operations require an active subscription`}</strong><span>{status === 'unavailable' ? 'Check your connection or retry before processing operational work.' : 'Submit or review your annual payment proof to continue.'}</span></div><button className="ghost-button" onClick={onOpen}>Open subscription</button></div>
 }
@@ -278,7 +324,7 @@ export function UserRolePanelWithCompany({ section }: { section: string }) {
 function PartnerDetailPanel({ partner, onClose }: { partner: Record<string, unknown>; onClose: () => void }) {
   const mapUrl = deliveryMapEmbedUrl(partner.latitude, partner.longitude)
   const type = String(partner.type ?? 'partner')
-  return <section className="content partner-detail-content"><div className="welcome-row"><div><p className="eyebrow">PARTNER PROFILE</p><h1>{String(partner.business_name ?? 'Partner')}</h1><p className="muted">{type} · {String(partner.approval_status ?? 'pending')}</p></div><button className="ghost-button" onClick={onClose}>Back to {type === 'warehouse' ? 'warehouses' : 'pharmacies'}</button></div><div className="partner-detail-grid"><section className="panel partner-info-card"><div className="panel-heading"><div><p className="eyebrow">BUSINESS INFORMATION</p><h2>{String(partner.business_name ?? 'Partner')}</h2></div><span className="status-pill">{String(partner.approval_status ?? 'pending')}</span></div><div className="partner-detail-fields"><p><span>Type</span><strong>{type}</strong></p><p><span>License number</span><strong>{String(partner.license_number ?? 'Not provided')}</strong></p><p><span>Subscription access</span><strong>{String(partner.subscription_status ?? 'Not configured')}</strong></p><p><span>Payment review</span><strong>{String(partner.payment_proof_status ?? 'Not submitted').replaceAll('_', ' ')}</strong></p>{partner.payment_proof_id && <button type="button" className="ghost-button" onClick={() => void downloadPrivate(`/admin/payment-proofs/${String(partner.payment_proof_id)}/download`, `medline-registration-payment-${String(partner.id)}`)}>View payment proof</button>}<p><span>Activation period</span><strong>{partner.subscription_starts_at && partner.subscription_ends_at ? String(partner.subscription_starts_at) + ' — ·? ? ' + String(partner.subscription_ends_at) : 'Not activated'}</strong></p><p><span>Phone</span><strong>{String(partner.phone ?? 'Not provided')}</strong></p><p><span>Contact person</span><strong>{String(partner.contact_name ?? 'Not provided')}</strong></p><p><span>Contact email</span><strong>{String(partner.contact_email ?? 'Not provided')}</strong></p></div></section><section className="panel partner-address-card"><div className="panel-heading"><div><p className="eyebrow">LOCATION</p><h2>Registered location</h2></div></div><p className="partner-address">{String(partner.address ?? 'Address not provided')}</p>{mapUrl ? <><iframe className="partner-map" title={`${String(partner.business_name ?? 'Partner')} location`} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" allowFullScreen /><a className="ghost-button" href={`https://www.openstreetmap.org/?mlat=${String(partner.latitude)}&mlon=${String(partner.longitude)}&zoom=16`} target="_blank" rel="noreferrer">Open in OpenStreetMap — ·? ?</a></> : <div className="state">Map coordinates are not available for this partner.</div>}</section></div></section>
+  return <section className="content partner-detail-content"><div className="welcome-row"><div><p className="eyebrow">PARTNER PROFILE</p><h1>{String(partner.business_name ?? 'Partner')}</h1><p className="muted">{type} · {String(partner.approval_status ?? 'pending')}</p></div><button className="ghost-button" onClick={onClose}>Back to {type === 'warehouse' ? 'warehouses' : 'pharmacies'}</button></div><div className="partner-detail-grid"><section className="panel partner-info-card"><div className="panel-heading"><div><p className="eyebrow">BUSINESS INFORMATION</p><h2>{String(partner.business_name ?? 'Partner')}</h2></div><span className="status-pill">{String(partner.approval_status ?? 'pending')}</span></div><div className="partner-detail-fields"><p><span>Type</span><strong>{type}</strong></p><p><span>License number</span><strong>{String(partner.license_number ?? 'Not provided')}</strong></p><p><span>Subscription access</span><strong>{String(partner.subscription_status ?? 'Not configured')}</strong></p><p><span>Payment review</span><strong>{String(partner.payment_proof_status ?? 'Not submitted').replaceAll('_', ' ')}</strong></p>{Boolean(partner.payment_proof_id) && <button type="button" className="ghost-button" onClick={() => void downloadPrivate(`/admin/payment-proofs/${String(partner.payment_proof_id)}/download`, `medline-registration-payment-${String(partner.id)}`)}>View payment proof</button>}<p><span>Activation period</span><strong>{partner.subscription_starts_at && partner.subscription_ends_at ? String(partner.subscription_starts_at) + ' — ·? ? ' + String(partner.subscription_ends_at) : 'Not activated'}</strong></p><p><span>Phone</span><strong>{String(partner.phone ?? 'Not provided')}</strong></p><p><span>Contact person</span><strong>{String(partner.contact_name ?? 'Not provided')}</strong></p><p><span>Contact email</span><strong>{String(partner.contact_email ?? 'Not provided')}</strong></p></div></section><section className="panel partner-address-card"><div className="panel-heading"><div><p className="eyebrow">LOCATION</p><h2>Registered location</h2></div></div><p className="partner-address">{String(partner.address ?? 'Address not provided')}</p>{mapUrl ? <><iframe className="partner-map" title={`${String(partner.business_name ?? 'Partner')} location`} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" allowFullScreen /><a className="ghost-button" href={`https://www.openstreetmap.org/?mlat=${String(partner.latitude)}&mlon=${String(partner.longitude)}&zoom=16`} target="_blank" rel="noreferrer">Open in OpenStreetMap — ·? ?</a></> : <div className="state">Map coordinates are not available for this partner.</div>}</section></div></section>
 }
 
 export function PartnerManagementPanel({ section }: { section: string }) {
@@ -312,6 +358,19 @@ export function ProcurementCreatePanel({ section }: { section: string }) {
 
 export function PrescriptionReviewPanel({ section }: { section: string }) {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([])
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = async () => { try { const response = await api.get('/pharmacy/prescriptions', { params: { status: 'pending_review', per_page: 50 } }); setRows(response.data.data ?? []) } catch { setRows([]) } }
+  useEffect(() => { if (section === 'orders') void load() }, [section])
+  const review = async (row: Record<string, unknown>, decision: 'approve' | 'reject') => { const id = String(row.id); const note = String(notes[id] ?? '').trim(); if (decision === 'reject' && !note) { setMessage('Add a rejection reason for this medicine so the patient knows what to correct.'); return } setBusy(`${id}:${decision}`); setMessage(''); try { await api.post(`/pharmacy/prescriptions/${id}/review`, { decision, ...(note ? { note } : {}) }, mutationConfig('prescription-review', id, decision)); setMessage(`Prescription for ${String(row.name_en ?? 'medicine')} ${decision === 'approve' ? 'approved' : 'rejected'}.`); await load() } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to review prescription.' : 'Unable to review prescription.') } finally { setBusy(null) } }
+  if (section !== 'orders') return null
+  return <section className="content prescription-review-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">PHARMACY SAFETY REVIEW</p><h2>Item-specific prescriptions</h2><p className="muted">Each prescription is tied to one medicine and must be reviewed separately.</p></div><span className="live-status"><i /> Restricted access</span></div>{message && <div className="form-message" role="status">{message}</div>}<div className="prescription-review-list">{rows.length === 0 ? <div className="state">No prescriptions are waiting for review.</div> : rows.map((row) => { const id = String(row.id); return <article className="prescription-review-item" key={id}><div className="prescription-medicine"><button type="button" onClick={() => row.medicine_id && openMedicineDetail(Number(row.medicine_id))}>{String(row.name_en ?? 'Prescription medicine')}</button><span>{String(row.dosage ?? row.form ?? '')} · Quantity {String(row.quantity ?? '—')}</span><small>Order {String(row.order_public_id ?? row.order_id)}</small></div><span className="status-pill">{String(row.status).replaceAll('_', ' ')}</span><button type="button" className="ghost-button" onClick={() => void downloadPrivate(`/prescriptions/${id}/download`, `prescription-${String(row.order_public_id ?? row.order_id)}-${String(row.name_en ?? id)}`)}><Eye size={17} /> View prescription</button><label>Pharmacist note<textarea value={notes[id] ?? ''} onChange={(event) => setNotes((current) => ({ ...current, [id]: event.target.value }))} placeholder="Required when rejecting" maxLength={1000} /></label><div className="row-actions"><button className="approve-button" disabled={busy !== null} onClick={() => void review(row, 'approve')}><FileCheck2 size={17} /> Approve</button><button className="reject-button" disabled={busy !== null} onClick={() => void review(row, 'reject')}><FileX2 size={17} /> Reject</button></div></article> })}</div></section></section>
+}
+
+void PrescriptionReviewPanelLegacy
+function PrescriptionReviewPanelLegacy({ section }: { section: string }) {
+  const [rows, setRows] = useState<Array<Record<string, unknown>>>([])
   const [message, setMessage] = useState('')
   const load = async () => { try { const response = await api.get('/pharmacy/prescriptions', { params: { status: 'pending_review', per_page: 50 } }); setRows(response.data.data ?? []) } catch { setRows([]) } }
   useEffect(() => { if (section === 'orders') void load() }, [section])
@@ -328,6 +387,9 @@ export function SettingsPage({ role, locale, onLocaleChange }: { role: string; l
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
   const [twoFactorCode, setTwoFactorCode] = useState('')
   const busyPreferenceKeys = useRef(new Set<string>())
+  void setTwoFactorSecret
+  void twoFactorEnabled
+  void setTwoFactorEnabled
   useEffect(() => { api.get('/notification-preferences').then((response) => setPreferences((current) => ({ ...current, ...(response.data.preferences ?? {}) }))).catch(() => setMessage('Unable to load notification preferences.')).finally(() => setLoading(false)) }, [])
   const update = async (key: string, value: boolean) => { if (busyPreferenceKeys.current.has(key)) return; busyPreferenceKeys.current.add(key); const previous = preferences[key]; setPreferences((current) => ({ ...current, [key]: value })); setMessage(''); try { await api.patch('/notification-preferences', { [key]: value }, mutationConfig('notification-preference', key, value ? 'on' : 'off')); setMessage('Notification preferences saved.') } catch { setPreferences((current) => ({ ...current, [key]: previous })); setMessage('Unable to save this preference.') } finally { busyPreferenceKeys.current.delete(key) } }
   const setupTwoFactor = async () => undefined
@@ -388,17 +450,101 @@ function RegistrationMapPicker({ latitude, longitude, onChange }: { latitude: st
 function RegistrationPage({ onBack, onAuthenticated }: { onBack: () => void; onAuthenticated: (user: Record<string, unknown>, token: string) => void }) {
   const [role, setRole] = useState('patient')
   const [form, setForm] = useState<Record<string, string>>({})
-  const [paymentProof, setPaymentProof] = useState<File | null>(null)
+  const [proof, setProof] = useState<File | null>(null)
+  const [plans, setPlans] = useState<Array<Record<string, unknown>>>([])
+  const [planError, setPlanError] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const partner = role === 'pharmacy' || role === 'warehouse'
+  const plan = plans.find((item) => item.partner_type === role)
   const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }))
+
+  useEffect(() => {
+    api.get('/subscription-plans')
+      .then((response) => { setPlans(response.data.data ?? []); setPlanError('') })
+      .catch(() => setPlanError('Subscription pricing is temporarily unavailable. Please retry before registering a pharmacy or warehouse.'))
+  }, [])
+  useEffect(() => {
+    if (partner && plan?.amount !== null && plan?.amount !== undefined) update('payment_amount', String(plan.amount))
+  }, [partner, plan?.amount])
+
+  const chooseRole = (value: string) => {
+    setRole(value)
+    setProof(null)
+    setError('')
+    setMessage('')
+    setForm((current) => ({
+      name: current.name ?? '', email: current.email ?? '', phone: current.phone ?? '',
+      password: current.password ?? '', password_confirmation: current.password_confirmation ?? '',
+    }))
+  }
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    if (partner && (!plan || !proof)) { setError(!plan ? 'The subscription plan could not be loaded.' : 'Upload your payment receipt.'); return }
+    setLoading(true)
+    try {
+      const values = { ...form, role, transport: 'cookie' }
+      const payload: FormData | Record<string, string> = partner ? new FormData() : values
+      if (payload instanceof FormData) {
+        Object.entries(values).forEach(([key, value]) => payload.append(key, value))
+        payload.append('payment_proof', proof as File)
+      }
+      const response = await api.post('/auth/register', payload)
+      setMessage(response.data.message ?? 'Registration submitted.')
+      if (response.data.token) {
+        localStorage.setItem('medline_token', response.data.token)
+        localStorage.removeItem('medline_refresh_token')
+        onAuthenticated(response.data.user ?? {}, response.data.token)
+      }
+    } catch (requestError) {
+      const data = axios.isAxiosError(requestError) ? requestError.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined : undefined
+      const details = Object.entries(data?.errors ?? {}).map(([field, entries]) => `${field.replaceAll('_', ' ')}: ${entries.join(' ')}`).join(' · ')
+      setError(details || data?.message || 'Unable to submit registration. Please try again.')
+    } finally { setLoading(false) }
+  }
+
+  return <div className="registration-page"><div className="registration-shell">
+    <aside className="registration-intro"><div className="brand login-brand"><div className="brand-mark">M</div><div><strong>MedLine</strong><span>Healthcare logistics</span></div></div><p className="eyebrow">JOIN THE NETWORK</p><h1>Create your MedLine account</h1><p className="muted">Select your role to see exactly what is required.</p><div className="registration-benefits"><div><strong>No subscription for patients or drivers</strong><span>Create the relevant profile without any subscription payment.</span></div><div><strong>Verified partner subscriptions</strong><span>Pharmacies and warehouses upload a receipt for administrator review.</span></div><div><strong>Clear correction workflow</strong><span>If a receipt needs correction, the administrator provides a comment before resubmission.</span></div></div></aside>
+    <section className="registration-card"><div className="registration-card-heading"><div><p className="eyebrow">NEW REGISTRATION</p><h2>Tell us about yourself</h2></div><button type="button" className="text-button" onClick={onBack}>Back to sign in</button></div>
+      <div className="registration-role-grid">{[['patient', 'Patient', 'No subscription'], ['pharmacy', 'Pharmacy', 'Subscription required'], ['warehouse', 'Warehouse', 'Subscription required'], ['driver', 'Driver', 'No subscription']].map(([value, label, hint]) => <button type="button" className={`registration-role ${role === value ? 'selected' : ''}`} key={value} onClick={() => chooseRole(value)}><strong>{label}</strong><span>{hint}</span></button>)}</div>
+      <form className="registration-form" onSubmit={submit}>
+        <div className="form-section-heading"><span>Account details</span><small>Required for every user</small></div>
+        <div className="registration-grid"><label>Full name<input value={form.name ?? ''} onChange={(event) => update('name', event.target.value)} required minLength={2} /></label><label>Email address<input type="email" value={form.email ?? ''} onChange={(event) => update('email', event.target.value)} required /></label><label>Phone number<input value={form.phone ?? ''} onChange={(event) => update('phone', event.target.value)} /></label><label>Password<input type="password" value={form.password ?? ''} onChange={(event) => update('password', event.target.value)} required minLength={8} /></label><label>Confirm password<input type="password" value={form.password_confirmation ?? ''} onChange={(event) => update('password_confirmation', event.target.value)} required minLength={8} /></label></div>
+        {partner && <><div className="form-section-heading"><span>{role === 'pharmacy' ? 'Pharmacy' : 'Warehouse'} details</span><small>Used for verification and deliveries</small></div><div className="registration-grid"><label>Business name<input value={form.business_name ?? ''} onChange={(event) => update('business_name', event.target.value)} required /></label><label>License number<input value={form.license_number ?? ''} onChange={(event) => update('license_number', event.target.value)} required /></label><label className="registration-span-2">Registered address<input value={form.address ?? ''} onChange={(event) => update('address', event.target.value)} required /></label></div><div className="form-section-heading"><span>Registered location</span><small>Click the map to set the exact point</small></div><RegistrationMapPicker latitude={form.latitude ?? ''} longitude={form.longitude ?? ''} onChange={(latitude, longitude) => setForm((current) => ({ ...current, latitude, longitude }))} /><div className="registration-grid coordinates"><label>Latitude<input value={form.latitude ?? ''} onChange={(event) => update('latitude', event.target.value)} required inputMode="decimal" /></label><label>Longitude<input value={form.longitude ?? ''} onChange={(event) => update('longitude', event.target.value)} required inputMode="decimal" /></label></div><div className="form-section-heading"><span>Initial subscription payment</span><small>{plan ? `${String(plan.duration_months)} months · administrator approval required` : 'Loading plan...'}</small></div>{planError && <div className="form-error">{planError}</div>}<div className="registration-grid"><label>Exact amount (SYP)<input value={form.payment_amount ?? ''} readOnly aria-readonly="true" required /><small className="field-help">This configured amount cannot be changed.</small></label><label>Payment receipt<input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setProof(event.target.files?.[0] ?? null)} required /><small className="field-help">JPG, PNG, or PDF showing the exact amount paid.</small></label></div></>}
+        {role === 'driver' && <><div className="form-section-heading"><span>Driver details</span><small>No subscription payment is required</small></div><div className="registration-grid"><label>National ID<input value={form.national_id ?? ''} onChange={(event) => update('national_id', event.target.value)} required /></label><label>Vehicle type<input value={form.vehicle_type ?? ''} onChange={(event) => update('vehicle_type', event.target.value)} required /></label><label>Vehicle plate<input value={form.vehicle_plate ?? ''} onChange={(event) => update('vehicle_plate', event.target.value)} required /></label></div></>}
+        {message && <div className="form-success" role="status">{message}</div>}{error && <div className="form-error" role="alert">{error}</div>}<div className="registration-submit"><span>{partner ? 'Your access starts only after administrator approval.' : 'This role does not require a subscription.'}</span><button className="primary-button" disabled={loading || (partner && !plan)}>{loading ? 'Submitting...' : partner ? 'Submit registration and payment' : 'Create account'}</button></div>
+      </form>
+    </section>
+  </div></div>
+}
+
+function RegistrationPageLegacy({ onBack, onAuthenticated }: { onBack: () => void; onAuthenticated: (user: Record<string, unknown>, token: string) => void }) {
+  const [role, setRole] = useState('patient')
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [paymentProof, setPaymentProof] = useState<File | null>(null)
+  const [plans, setPlans] = useState<Array<Record<string, unknown>>>([])
+  const [planError, setPlanError] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const partner = role === 'pharmacy' || role === 'warehouse'
+  const selectedPlan = plans.find((plan) => plan.partner_type === role)
+  useEffect(() => { api.get('/subscription-plans').then((response) => { setPlans(response.data.data ?? []); setPlanError('') }).catch(() => setPlanError('Subscription pricing is temporarily unavailable. Please try again before registering a pharmacy or warehouse.')) }, [])
+  useEffect(() => { if (partner && selectedPlan?.amount !== null && selectedPlan?.amount !== undefined) setForm((current) => ({ ...current, payment_amount: String(selectedPlan.amount) })) }, [partner, selectedPlan?.amount])
+  const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }))
+  const chooseRole = (value: string) => { setRole(value); setPaymentProof(null); setError(''); setMessage(''); setForm((current) => ({ name: current.name ?? '', email: current.email ?? '', phone: current.phone ?? '', password: current.password ?? '', password_confirmation: current.password_confirmation ?? '' })) }
+  void planError
+  void chooseRole
   const highlightErrors = (errors: Record<string, string[]>) => { const aliases: Record<string, string[]> = { name: ['full name'], email: ['email address'], phone: ['phone number'], password_confirmation: ['confirm password'], password: ['password'], business_name: ['business name'], license_number: ['license number'], address: ['registered address'], latitude: ['latitude'], longitude: ['longitude'], national_id: ['national id'], vehicle_type: ['vehicle type'], vehicle_plate: ['vehicle plate'], payment_amount: ['payment amount'], payment_proof: ['payment proof'] }; document.querySelectorAll('.registration-form label').forEach((label) => { const text = label.textContent?.toLowerCase() ?? ''; const field = Object.keys(aliases).find((key) => aliases[key].some((alias) => text.includes(alias))); const input = label.querySelector('input'); if (input) input.classList.toggle('registration-invalid', Boolean(field && errors[field])) }) }
   const validateBeforeSubmit = () => { const errors: Record<string, string[]> = {}; const required = ['name', 'email', 'password', 'password_confirmation', ...(partner ? ['business_name', 'license_number', 'address', 'latitude', 'longitude', 'payment_amount'] : []), ...(role === 'driver' ? ['national_id', 'vehicle_type', 'vehicle_plate'] : [])]; required.forEach((field) => { if (!String(form[field] ?? '').trim()) errors[field] = ['This field is required.'] }); if (partner && !paymentProof) errors.payment_proof = ['Payment proof is required.']; if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) errors.email = ['Enter a valid email address.']; if (form.password && form.password.length < 8) errors.password = ['Use at least 8 characters.']; if (form.password !== form.password_confirmation) errors.password_confirmation = ['Passwords do not match.']; if (partner) { const latitude = Number(form.latitude); const longitude = Number(form.longitude); if (form.latitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) errors.latitude = ['Enter a latitude between -90 and 90.']; if (form.longitude && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) errors.longitude = ['Enter a longitude between -180 and 180.']; } return errors }
   const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); setMessage(''); document.querySelectorAll('.registration-invalid').forEach((input) => input.classList.remove('registration-invalid')); const localErrors = validateBeforeSubmit(); if (Object.keys(localErrors).length) { highlightErrors(localErrors); setError(Object.entries(localErrors).map(([field, messages]) => `${field.replaceAll('_', ' ')}: ${messages.join(' ')}`).join(' · ')); return } setLoading(true); try { const payload = partner ? new FormData() : { ...form, role, transport: 'cookie' }; if (partner) { Object.entries({ ...form, role, transport: 'cookie' }).forEach(([key, value]) => (payload as FormData).append(key, value)); (payload as FormData).append('payment_proof', paymentProof as File) } const response = await api.post('/auth/register', payload, partner ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined); if (!response.data.token) { setMessage(response.data.message ?? 'Registration submitted for administrator approval.'); return } localStorage.setItem('medline_token', response.data.token); localStorage.removeItem('medline_refresh_token'); setMessage(response.data.message ?? 'Registration submitted.'); onAuthenticated(response.data.user ?? {}, response.data.token) } catch (requestError) { if (axios.isAxiosError(requestError)) { const data = requestError.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined; const errors = data?.errors ?? {}; highlightErrors(errors); const details = Object.entries(errors).map(([field, messages]) => `${field.replaceAll('_', ' ')}: ${messages.join(' ')}`).join(' · '); const status = requestError.response?.status; setError(details || data?.message || (status ? `Registration failed (HTTP ${status}). Please review the form and try again.` : 'Cannot reach the MedLine server. Start the Laravel API on http://127.0.0.1:8000 and try again.')) } else setError('Cannot reach the MedLine server. Start the Laravel API on http://127.0.0.1:8000 and try again.') } finally { setLoading(false) } }
-  const partner = role === 'pharmacy' || role === 'warehouse'
   return <div className="registration-page"><div className="registration-shell"><div className="registration-intro"><div className="brand login-brand"><div className="brand-mark">M</div><div><strong>MedLine</strong><span>Healthcare logistics</span></div></div><p className="eyebrow">JOIN THE NETWORK</p><h1>Create your MedLine account</h1><p className="muted">Choose your role and provide the details needed to activate your healthcare operations profile.</p><div className="registration-benefits"><div><strong>One secure account</strong><span>Use the same identity across portal and mobile.</span></div><div><strong>Verified operations</strong><span>Pharmacy, warehouse, and driver applications are reviewed before access.</span></div><div><strong>Location-ready delivery</strong><span>Pin approved pharmacy and warehouse locations directly on OpenStreetMap.</span></div></div></div><section className="registration-card"><div className="registration-card-heading"><div><p className="eyebrow">NEW REGISTRATION</p><h2>Tell us about yourself</h2></div><button type="button" className="text-button" onClick={onBack}>Back to sign in</button></div><div className="registration-role-grid">{[['patient', 'Customer', 'Order medicines and track deliveries'], ['pharmacy', 'Pharmacy', 'Fulfil prescriptions and request stock'], ['warehouse', 'Warehouse', 'Supply approved pharmacy partners'], ['driver', 'Driver', 'Deliver orders and update trips']].map(([value, label, hint]) => <button type="button" className={`registration-role ${role === value ? 'selected' : ''}`} key={value} onClick={() => { setRole(value); setForm(value === 'pharmacy' ? { payment_amount: '12000' } : value === 'warehouse' ? { payment_amount: '24000' } : {}); setPaymentProof(null) }}><strong>{label}</strong><span>{hint}</span></button>)}</div><form className="registration-form" onSubmit={submit}><div className="form-section-heading"><span>Account details</span><small>Required for every user</small></div><div className="registration-grid"><label>Full name<input value={form.name ?? ''} onChange={(event) => update('name', event.target.value)} required minLength={2} placeholder="Your full name" /></label><label>Email address<input type="email" value={form.email ?? ''} onChange={(event) => update('email', event.target.value)} required placeholder="you@example.com" /></label><label>Phone number<input value={form.phone ?? ''} onChange={(event) => update('phone', event.target.value)} placeholder="+963..." /></label><label>Password<input type="password" value={form.password ?? ''} onChange={(event) => update('password', event.target.value)} required minLength={8} placeholder="At least 8 characters" /></label><label>Confirm password<input type="password" value={form.password_confirmation ?? ''} onChange={(event) => update('password_confirmation', event.target.value)} required minLength={8} placeholder="Repeat your password" /></label></div>{partner && <><div className="form-section-heading"><span>{role === 'pharmacy' ? 'Pharmacy details' : 'Warehouse details'}</span><small>Used for verification and deliveries</small></div><div className="registration-grid"><label>Business name<input value={form.business_name ?? ''} onChange={(event) => update('business_name', event.target.value)} required placeholder={role === 'pharmacy' ? 'Central Pharmacy' : 'United Medical Warehouse'} /></label><label>License number<input value={form.license_number ?? ''} onChange={(event) => update('license_number', event.target.value)} required placeholder="Official license number" /></label><label className="registration-span-2">Registered address<input value={form.address ?? ''} onChange={(event) => update('address', event.target.value)} required placeholder="Street, district, city" /></label></div><div className="form-section-heading"><span>Registered location</span><small>Click the map to set the exact point</small></div><RegistrationMapPicker latitude={form.latitude ?? ''} longitude={form.longitude ?? ''} onChange={(latitude, longitude) => setForm((current) => ({ ...current, latitude, longitude }))} /><div className="registration-grid coordinates"><label>Latitude<input value={form.latitude ?? ''} onChange={(event) => update('latitude', event.target.value)} required inputMode="decimal" /></label><label>Longitude<input value={form.longitude ?? ''} onChange={(event) => update('longitude', event.target.value)} required inputMode="decimal" /></label></div><div className="form-section-heading"><span>Initial subscription</span><small>Required for pharmacy and warehouse registration · valid for one year after approval</small></div><div className="registration-grid"><label>Payment amount (SYP) (Required)<input type="number" min="0" step="0.01" value={form.payment_amount ?? ''} onChange={(event) => update('payment_amount', event.target.value)} required placeholder="12,000 SYP" /></label><label>Payment proof (Required)<input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setPaymentProof(event.target.files?.[0] ?? null)} required /></label></div></>}{role === 'driver' && <><div className="form-section-heading"><span>Driver details</span><small>Required for delivery review</small></div><div className="registration-grid"><label>National ID<input value={form.national_id ?? ''} onChange={(event) => update('national_id', event.target.value)} required placeholder="Government ID" /></label><label>Vehicle type<input value={form.vehicle_type ?? ''} onChange={(event) => update('vehicle_type', event.target.value)} required placeholder="Motorcycle, car, van..." /></label><label>Vehicle plate<input value={form.vehicle_plate ?? ''} onChange={(event) => update('vehicle_plate', event.target.value)} required placeholder="Plate number" /></label></div></>}{message && <div className="form-success">{message}</div>}{error && <div className="form-error">{error}</div>}<div className="registration-submit"><span>By registering, you agree to MedLine verification and privacy procedures.</span><button className="primary-button" disabled={loading}>{loading ? 'Submitting...' : 'Create account'}</button></div></form></section></div></div>
 }
+
+void RegistrationPageLegacy
 
 export function LoginPage({ locale, onAuthenticated }: { locale: string; onAuthenticated: (user: Record<string, unknown>) => void }) {
   const [email, setEmail] = useState('')
@@ -417,6 +563,27 @@ export function LoginPage({ locale, onAuthenticated }: { locale: string; onAuthe
   const requestReset = async (event: FormEvent) => { event.preventDefault(); setError(''); setLoading(true); try { const response = await api.post('/auth/forgot-password', { email }); setRecoveryMessage(response.data.message ?? 'Recovery instructions have been sent if the account exists.'); setResetRequested(true) } catch (requestError) { setError(axios.isAxiosError(requestError) ? requestError.response?.data?.message ?? 'Unable to request password recovery.' : 'Unable to request password recovery.') } finally { setLoading(false) } }
   const completeReset = async (event: FormEvent) => { event.preventDefault(); setError(''); setLoading(true); try { const response = await api.post('/auth/reset-password', { email, token: resetToken, password: resetPassword, password_confirmation: resetConfirmation }); setRecoveryMessage(response.data.message ?? 'Password reset successfully.'); setRecoveryMode(false); setResetToken(''); setResetPassword(''); setResetConfirmation('') } catch (requestError) { setError(axios.isAxiosError(requestError) ? requestError.response?.data?.message ?? 'Unable to reset password.' : 'Unable to reset password.') } finally { setLoading(false) } }
   return <div className="login-page"><div className="login-card"><div className="brand login-brand"><div className="brand-mark">M</div><div><strong>MedLine</strong><span>{text('healthcareLogistics')}</span></div></div><p className="eyebrow">{text('secureOperations')}</p><h1>{recoveryMode ? (resetRequested ? text('resetYourPassword') : text('recoverPassword')) : text('welcomeBack')}</h1><p className="muted">{recoveryMode ? (resetRequested ? text('resetHint') : text('recoveryHint')) : text('signInWorkspace')}</p>{recoveryMode ? (resetRequested ? <form onSubmit={completeReset}><label>{text('emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>{text('resetToken')}<input value={resetToken} onChange={(event) => setResetToken(event.target.value)} minLength={64} required /></label><label>{text('newPassword')}<input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} minLength={8} required /></label><label>{text('confirmPassword')}<input type="password" value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} minLength={8} required /></label>{recoveryMessage && <div className="form-success">{recoveryMessage}</div>}{error && <div className="form-error">{error}</div>}<button className="primary-button login-button" disabled={loading}>{loading ? text('resetting') : text('resetPassword')}</button><button type="button" className="text-button" onClick={() => { setRecoveryMode(false); setResetRequested(false); setError(''); setRecoveryMessage('') }}>{text('backToSignIn')}</button></form> : <form onSubmit={requestReset}><label>{text('emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>{recoveryMessage && <div className="form-success">{recoveryMessage}</div>}{error && <div className="form-error">{error}</div>}<button className="primary-button login-button" disabled={loading}>{loading ? text('sending') : text('sendRecovery')}</button><button type="button" className="text-button" onClick={() => { setRecoveryMode(false); setError(''); setRecoveryMessage('') }}>{text('backToSignIn')}</button></form>) : <form onSubmit={login}><label>{text('emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@medline.local" required /></label><label>{text('password')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" required /></label><label>{text('authCodeLabel')}<input inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={(event) => setTwoFactorCode(event.target.value)} placeholder={text('optionalCode')} /></label>{recoveryMessage && <div className="form-success">{recoveryMessage}</div>}{error && <div className="form-error">{error}</div>}<button className="primary-button login-button" disabled={loading}>{loading ? text('signingIn') : text('signIn')}</button><button type="button" className="text-button" onClick={() => { setRecoveryMode(true); setResetRequested(false); setError(''); setRecoveryMessage('') }}>{text('forgotPassword')}</button></form>}</div></div>
+}
+
+export function MedicineDetailPage({ medicineId, onBack, locale }: { medicineId: number; onBack: () => void; locale: string }) {
+  const [medicine, setMedicine] = useState<Record<string, any> | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { setMedicine(null); setError(''); api.get(`/medicines/${medicineId}`).then((response) => setMedicine(response.data.medicine ?? response.data)).catch((loadError) => setError(axios.isAxiosError(loadError) ? loadError.response?.data?.message ?? 'Unable to load medicine details.' : 'Unable to load medicine details.')) }, [medicineId])
+  if (error) return <section className="content medicine-detail-page"><button className="ghost-button" onClick={onBack}>Back</button><div className="form-error">{error}</div></section>
+  if (!medicine) return <section className="content medicine-detail-page"><div className="state">Loading medicine information...</div></section>
+  const category = (medicine.category ?? {}) as Record<string, unknown>
+  const pharmacies = Array.isArray(medicine.available_at) ? medicine.available_at as Array<Record<string, unknown>> : []
+  const detailSections = [
+    ['Description', medicine.description, 'General product information has not been provided yet.'],
+    ['Uses and indications', medicine.indications, 'Indications have not been provided.'],
+    ['Directions', medicine.directions, 'Follow the prescriber or pharmacist instructions.'],
+    ['Possible side effects', medicine.side_effects, 'Side-effect information has not been provided.'],
+    ['Warnings and precautions', medicine.warnings, 'Consult a healthcare professional before use.'],
+    ['Contraindications', medicine.contraindications, 'Contraindication information has not been provided.'],
+    ['Drug interactions', medicine.drug_interactions, 'Tell your pharmacist about all medicines and supplements you use.'],
+    ['Storage', medicine.storage_instructions, 'Store according to the package instructions and keep out of reach of children.'],
+  ]
+  return <section className="content medicine-detail-page"><button className="medicine-back-button" type="button" onClick={onBack}>← Back to catalog</button><div className="medicine-detail-hero"><div className="medicine-image-frame">{medicine.image_url ? <img src={String(medicine.image_url)} alt={`Package of ${String(medicine.name_en)}`} /> : <div className="medicine-image-placeholder" aria-label="Medicine image unavailable"><span>Rx</span><small>Image unavailable</small></div>}</div><div className="medicine-hero-copy"><p className="eyebrow">{String(category.name_en ?? 'MEDICINE')}</p><h1>{String(medicine.name_en)}</h1><p className="medicine-arabic-name" lang="ar" dir="rtl">{String(medicine.name_ar ?? '')}</p><p className="medicine-description-lead">{String(medicine.description ?? 'Detailed medicine information and pharmacy availability.')}</p><div className="medicine-fact-pills"><span><strong>Active ingredient</strong>{String(medicine.active_ingredient ?? 'Not specified')}</span><span><strong>Strength</strong>{String(medicine.dosage ?? 'Not specified')}</span><span><strong>Form</strong>{String(medicine.form ?? 'Not specified')}</span><span><strong>Route</strong>{String(medicine.administration_route ?? 'Not specified')}</span><span><strong>Pack size</strong>{String(medicine.pack_size ?? 'Not specified')}</span><span><strong>Manufacturer</strong>{String(medicine.manufacturer ?? 'Not specified')}</span></div><div className={`medicine-prescription-callout ${medicine.prescription_required ? 'required' : 'not-required'}`}><ShieldCheck size={20} aria-hidden="true" /><div><strong>{medicine.prescription_required ? 'Prescription required' : 'No prescription required'}</strong><span>{medicine.prescription_required ? 'A separate prescription must be uploaded for this medicine when ordering.' : 'A pharmacy may still provide usage guidance before fulfilment.'}</span></div></div></div></div><div className="medicine-detail-layout"><div className="medicine-information-stack">{detailSections.map(([heading, value, fallback]) => <section className="panel medicine-information-card" key={String(heading)}><h2>{String(heading)}</h2><p className={value ? '' : 'muted'}>{String(value ?? fallback)}</p></section>)}<div className="medicine-safety-note"><ShieldCheck size={20} aria-hidden="true" /><p><strong>Safety note</strong>This catalog supports informed ordering but does not replace advice from a doctor or pharmacist. Seek urgent medical help for severe or unexpected reactions.</p></div></div><aside className="panel medicine-availability-card"><p className="eyebrow">AVAILABILITY</p><h2>Available pharmacies</h2><p className="muted">Prices and quantities reflect current available inventory.</p>{pharmacies.length === 0 ? <div className="state">No approved pharmacy currently lists this medicine.</div> : <div className="medicine-pharmacy-list">{pharmacies.map((pharmacy) => <div key={String(pharmacy.id)}><strong>{String(pharmacy.business_name)}</strong><span>{String(pharmacy.address ?? 'Address not provided')}</span><small>{String(pharmacy.available_quantity)} available · {formatMedlineMoney(pharmacy.unit_price, 'SYP', locale)}</small></div>)}</div>}<a className="primary-button" href="/orders"><ShoppingCart size={17} /> Start an order</a><dl className="medicine-reference"><div><dt>Product code</dt><dd>{String(medicine.code ?? 'Not provided')}</dd></div><div><dt>Catalog status</dt><dd>{medicine.is_active ? 'Active' : 'Inactive'}</dd></div></dl></aside></div></section>
 }
 
 export function Dashboard({ role }: { role: string }) {
@@ -478,6 +645,22 @@ export function LiveDashboard({ role, locale }: { role: string; locale: string }
   }, [role])
   useEffect(() => { document.title = `MedLine · ${roleTitle}` }, [roleTitle])
   const selectSuggestion = (value: string) => setQuery(value)
+  useEffect(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.search-panel .medicine-card'))
+    const cleanups = cards.map((card, index) => {
+      const medicine = medicines[index]
+      if (!medicine) return () => undefined
+      card.setAttribute('role', 'button')
+      card.setAttribute('tabindex', '0')
+      card.setAttribute('aria-label', `View details for ${medicine.name_en}`)
+      const open = () => openMedicineDetail(medicine.id)
+      const keyboard = (event: KeyboardEvent) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open() } }
+      card.addEventListener('click', open)
+      card.addEventListener('keydown', keyboard)
+      return () => { card.removeEventListener('click', open); card.removeEventListener('keydown', keyboard) }
+    })
+    return () => cleanups.forEach((cleanup) => cleanup())
+  }, [medicines])
   return <section className="content"><div className="welcome-row"><div><p className="eyebrow">MEDLINE OPERATIONS</p><h1>{roleTitle}</h1><p className="muted">{tr('guidance', locale)}</p></div></div><div className="metric-grid"><Metric label="Active orders" value="0" change="Live" icon={<ClipboardList />} tone="blue" /><Metric label="Pending verification" value="0" change="Live" icon={<ShieldCheck />} tone="violet" /><Metric label="In delivery" value="0" change="Live" icon={<Truck />} tone="orange" /><Metric label="Registered partners" value="0" change="Live" icon={<Users />} tone="green" /></div><div className="dashboard-grid"><section className="panel search-panel"><div className="panel-heading"><div><p className="eyebrow">{tr('catalog', locale)}</p><h2>{tr('medicineSearch', locale)}</h2></div></div><div className="search-box"><Search size={19} aria-hidden="true" /><input aria-label={tr('medicineSearch', locale)} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr('searchPlaceholder', locale)} /></div>{suggestions.length > 0 && <div className="suggestion-list" aria-label={tr('medicineSearch', locale)}>{suggestions.slice(0, 5).map((suggestion) => <button type="button" className="suggestion-chip" key={String(suggestion.id)} onClick={() => selectSuggestion(String(suggestion.name_en ?? ''))}>{String(suggestion.name_en ?? suggestion.name_ar ?? tr('medicineSearch', locale))}<small>{String(suggestion.match_score ?? '')}</small></button>)}</div>}<div className="medicine-list" aria-busy={loading}>{loading ? <div className="state" role="status">{tr('searching', locale)}</div> : medicines.length === 0 ? <div className="state" role="status">{tr('noMedicines', locale)}</div> : medicines.map((medicine) => <div className="medicine-card" key={medicine.id}><div className="medicine-icon" aria-hidden="true">Rx</div><div className="medicine-info"><strong>{medicine.name_en}</strong><span>{medicine.name_ar} · {medicine.manufacturer ?? tr('manufacturerPending', locale)}</span></div><div className="medicine-tag">{medicine.prescription_required ? tr('prescription', locale) : tr('noPrescription', locale)}</div><ChevronRight size={17} aria-hidden="true" className="chevron" /></div>)}</div>{medicines.length === 0 && emptySuggestions.length > 0 && <div className="empty-suggestions"><span>{tr('tryInstead', locale)}</span>{emptySuggestions.map((suggestion) => <button type="button" className="text-button" key={suggestion} onClick={() => selectSuggestion(suggestion)}>{suggestion}</button>)}</div>}</section><section className="panel activity-panel"><div className="panel-heading"><div><p className="eyebrow">{tr('operations', locale)}</p><h2>{tr('roleMetrics', locale)}</h2></div><span className="live-status" role="status"><i aria-hidden="true" /> {tr('liveData', locale)}</span></div><Activity icon="OK" title={`${String(metrics.orders ?? 0)} ${tr('ordersInScope', locale)}`} detail={`${String(metrics.active_deliveries ?? 0)} ${tr('activeDeliveries', locale)}`} tone="green" /><Activity icon="!" title={`${String(metrics.pending_orders ?? metrics.pending_procurement ?? 0)} ${tr('itemsPending', locale)}`} detail={`${String(metrics.low_stock_items ?? 0)} ${tr('lowStockItems', locale)}`} tone="orange" /></section></div></section>
 }
 
@@ -511,7 +694,7 @@ export function NotificationHealthPanel({ role, locale }: { role: string; locale
     const loadHealth = async () => {
       if (inFlight) return
       inFlight = true
-      try { const response = await api.get('/admin/notification-delivery-health'); if (active) setHealth(response.data) }
+      try { const response = await api.get('/admin/notification-delivery-health'); if (active) setHealth({ ...response.data, recent_failures: (response.data.recent_failures ?? []).map((failure: Record<string, unknown>) => ({ ...failure, notification_type: humanizeNotificationType(failure.notification_type) })) }) }
       catch { /* Preserve the last successful health snapshot during transient outages. */ }
       finally { inFlight = false }
     }
@@ -562,12 +745,130 @@ function MedicineEditAdminPage({ locale }: { locale: string }) {
   useEffect(() => { document.title = `MedLine · ${tr('editMedicine', locale)}` }, [locale])
   const selected = rows.find((row) => String(row.id) === selectedId)
   useEffect(() => { api.get('/medicines', { params: { per_page: 100 } }).then((response) => setRows(response.data.data ?? [])).catch(() => setRows([])) }, [])
-  const update = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!selectedId) return; const form = new FormData(event.currentTarget); try { await api.patch(`/medicines/${selectedId}`, { name_en: form.get('name_en'), name_ar: form.get('name_ar'), manufacturer: form.get('manufacturer'), form: form.get('form'), dosage: form.get('dosage'), code: form.get('code'), prescription_required: form.get('prescription_required') === 'on', is_active: form.get('is_active') === 'on' }, mutationConfig('medicine', selectedId, 'update')); setMessage('Medicine updated.'); const response = await api.get('/medicines', { params: { per_page: 100 } }); setRows(response.data.data ?? []) } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to update medicine.' : 'Unable to update medicine.') } }
+  const update = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!selectedId) return; const form = new FormData(event.currentTarget); const detailFields = ['name_en', 'name_ar', 'manufacturer', 'active_ingredient', 'form', 'dosage', 'pack_size', 'administration_route', 'code', 'description', 'indications', 'directions', 'side_effects', 'warnings', 'contraindications', 'drug_interactions', 'storage_instructions']; const payload = Object.fromEntries(detailFields.map((field) => [field, form.get(field)])); try { await api.patch(`/medicines/${selectedId}`, { ...payload, prescription_required: form.get('prescription_required') === 'on', is_active: form.get('is_active') === 'on' }, mutationConfig('medicine', selectedId, 'update')); setMessage('Medicine updated.'); const response = await api.get('/medicines', { params: { per_page: 100 } }); setRows(response.data.data ?? []) } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to update medicine.' : 'Unable to update medicine.') } }
   const deactivate = async (id: string) => { try { await api.delete(`/medicines/${id}`, mutationConfig('medicine', id, 'deactivate')); setMessage('Medicine deleted.'); setSelectedId(''); const response = await api.get('/medicines', { params: { per_page: 100 } }); setRows(response.data.data ?? []) } catch { setMessage('Unable to delete medicine.') } }
   return <section className="content"><section className="panel medicine-edit-workspace"><div className="panel-heading"><div><p className="eyebrow">{tr('catalogRefinement', locale)}</p><h2>{tr('editMedicine', locale)}</h2></div></div><div className="operations-table medicine-edit-table"><div className="table-row table-head"><span>Medicine</span><span>Manufacturer</span><span>Form / dosage</span><span>Prescription</span><span>Action</span></div>{rows.map((row) => <div className="table-row" key={String(row.id)}><strong>{String(row.name_en)}<small>{String(row.name_ar ?? '')}</small></strong><span>{String(row.manufacturer ?? '—')}</span><span>{String(row.form ?? '—')} · {String(row.dosage ?? '—')}</span><span className="status-pill">{row.prescription_required ? tr('prescription', locale) : tr('noPrescription', locale)}</span><div className="row-actions"><button className="ghost-button" type="button" onClick={() => setSelectedId(String(row.id))}>View</button><button className="approve-button" type="button" onClick={() => setSelectedId(String(row.id))}>Edit</button><button className="reject-button" type="button" onClick={() => void deactivate(String(row.id))}>Delete</button></div></div>)}</div>{selected && <div className="medicine-edit-form"><div className="panel-heading"><div><p className="eyebrow">EDIT FORM</p><h3>{String(selected.name_en)}</h3></div><button className="ghost-button" type="button" onClick={() => setSelectedId('')}>Close</button></div><form className="inline-form" key={selectedId} onSubmit={update}><input name="name_en" defaultValue={String(selected.name_en ?? '')} placeholder={tr('englishName', locale)} required /><input name="name_ar" defaultValue={String(selected.name_ar ?? '')} placeholder={tr('arabicName', locale)} required /><input name="manufacturer" defaultValue={String(selected.manufacturer ?? '')} placeholder={tr('manufacturer', locale)} /><input name="form" defaultValue={String(selected.form ?? '')} placeholder={tr('form', locale)} /><input name="dosage" defaultValue={String(selected.dosage ?? '')} placeholder={tr('dosage', locale)} /><input name="code" defaultValue={String(selected.code ?? '')} placeholder={tr('code', locale)} /><label className="check-field"><input name="prescription_required" type="checkbox" defaultChecked={Boolean(selected.prescription_required)} /> {tr('prescription', locale)}</label><label className="check-field"><input name="is_active" type="checkbox" defaultChecked={selected.is_active !== false} /> {tr('active', locale)}</label><button className="primary-button" type="submit">{tr('saveMedicine', locale)}</button></form></div>}{message && <div className="form-success" role="status">{message}</div>}</section></section>
 }
 
+export function AdminSubscriptionReviewPage({ locale }: { locale: string }) {
+  const [rows, setRows] = useState<Array<Record<string, unknown>>>([])
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('payment_under_review')
+  const [origin, setOrigin] = useState('')
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [lastPage, setLastPage] = useState(1)
+  const load = async () => {
+    setLoading(true)
+    try {
+      const response = await api.get('/admin/subscriptions', { params: { search, status, origin, page, per_page: 20 } })
+      setRows(response.data.data ?? [])
+      setLastPage(Number(response.data.last_page ?? 1))
+    } catch (loadError) { setMessage(axios.isAxiosError(loadError) ? loadError.response?.data?.message ?? 'Unable to load subscription reviews.' : 'Unable to load subscription reviews.') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [search, status, origin, page])
+  const decide = async (row: Record<string, unknown>, decision: 'approve' | 'correction' | 'reject') => {
+    const id = String(row.id)
+    const note = String(notes[id] ?? '').trim()
+    if (decision === 'correction' && !note) { setMessage('Add a clear correction comment before requesting changes.'); return }
+    if (decision === 'reject' && !window.confirm(`Reject the ${String(row.origin ?? '')} payment from ${String(row.business_name ?? 'this partner')}?`)) return
+    setBusy(`${id}:${decision}`)
+    setMessage('')
+    try {
+      const response = await api.post(`/admin/subscriptions/${id}/decision`, { decision, ...(note ? { note } : {}) }, mutationConfig('subscription-decision', id, decision))
+      setMessage(response.data.message ?? 'Payment review saved.')
+      setNotes((current) => ({ ...current, [id]: '' }))
+      await load()
+    } catch (decisionError) { setMessage(axios.isAxiosError(decisionError) ? decisionError.response?.data?.message ?? 'Unable to save this payment review.' : 'Unable to save this payment review.') }
+    finally { setBusy(null) }
+  }
+  const textStatus = (value: unknown) => String(value ?? '').replaceAll('_', ' ')
+
+  return <section className="content subscription-review-page"><div className="welcome-row"><div><p className="eyebrow">FINANCE & ACCESS</p><h1>Subscription reviews</h1><p className="muted">Review registration and renewal receipts, then approve, request a correction, or reject.</p></div><span className="live-status"><i /> Audited decisions</span></div>
+    <section className="panel subscription-review-panel"><div className="subscription-review-filters"><label>Search<input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value) }} placeholder="Business, contact, email, or plan" /></label><label>Review status<select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="payment_under_review">Needs review</option><option value="correction_required">Correction requested</option><option value="active">Approved</option><option value="rejected">Rejected</option><option value="">All statuses</option></select></label><label>Payment type<select value={origin} onChange={(event) => { setPage(1); setOrigin(event.target.value) }}><option value="">Registration and renewal</option><option value="registration">Registration</option><option value="renewal">Renewal</option></select></label></div>
+      {message && <div className="form-message" role="status">{message}</div>}
+      <div className="subscription-review-list">{loading ? <div className="state">Loading payment reviews...</div> : rows.length === 0 ? <div className="state">No subscription payments match these filters.</div> : rows.map((row) => { const id = String(row.id); const pending = row.status === 'payment_under_review'; return <article className="subscription-review-item" key={id}><div className="subscription-review-main"><div className="subscription-review-title"><div><span className="review-origin">{textStatus(row.origin)} · {textStatus(row.type)}</span><h2>{String(row.business_name ?? 'Partner')}</h2><p>{String(row.contact_name ?? 'Contact')} · {String(row.contact_email ?? '')}</p></div><span className={`status-pill review-status-${String(row.status)}`}>{textStatus(row.status)}</span></div><dl className="subscription-review-facts"><div><dt>Exact amount submitted</dt><dd>{formatMedlineMoney(row.amount, 'SYP', locale)}</dd></div><div><dt>Plan</dt><dd>{textStatus(row.plan_code)} · {String(row.duration_months ?? 12)} months</dd></div><div><dt>Submitted</dt><dd>{formatMedlineDate(row.created_at, locale)}</dd></div><div><dt>Activation dates</dt><dd>{row.starts_at ? `${String(row.starts_at)} – ${String(row.ends_at ?? 'Open')}` : 'Assigned after approval'}</dd></div></dl>{Boolean(row.review_note) && <div className="admin-review-note"><strong>Previous administrator comment</strong><span>{String(row.review_note)}</span></div>}</div><aside className="subscription-review-actions">{Boolean(row.payment_proof_id) && <button type="button" className="ghost-button receipt-button" onClick={() => void downloadPrivate(`/admin/payment-proofs/${String(row.payment_proof_id)}/download`, `medline-payment-${id}`)}><Eye size={18} /> View receipt</button>}{pending ? <><label>Review comment<textarea value={notes[id] ?? ''} onChange={(event) => setNotes((current) => ({ ...current, [id]: event.target.value }))} placeholder="Required when requesting a correction" maxLength={1000} /></label><div className="review-decision-buttons"><button type="button" className="approve-button" disabled={busy !== null} onClick={() => void decide(row, 'approve')}><FileCheck2 size={18} /> Approve</button><button type="button" className="correction-button" disabled={busy !== null} onClick={() => void decide(row, 'correction')}>Request correction</button><button type="button" className="reject-button" disabled={busy !== null} onClick={() => void decide(row, 'reject')}><FileX2 size={18} /> Reject</button></div></> : <p className="muted">{row.status === 'correction_required' ? 'Waiting for the partner to upload a corrected receipt.' : `Reviewed ${row.reviewed_at ? formatMedlineDate(row.reviewed_at, locale) : ''}`}</p>}</aside></article> })}</div><TablePagination page={page} lastPage={lastPage} onPageChange={setPage} />
+    </section>
+  </section>
+}
+
 function PartnerSubscriptionPage({ locale }: { locale: string }) {
+  const [record, setRecord] = useState<Record<string, any>>({})
+  const [plan, setPlan] = useState<Record<string, unknown> | null>(null)
+  const [profile, setProfile] = useState<Record<string, string>>({})
+  const [proof, setProof] = useState<File | null>(null)
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const idempotencyKey = useRef<string | null>(null)
+  const active = record.active_subscription as Record<string, unknown> | null
+  const review = record.review_subscription as Record<string, unknown> | null
+  const scheduled = record.scheduled_subscription as Record<string, unknown> | null
+  const payment = record.payment_proof as Record<string, unknown> | null
+  const partner = record.partner as Record<string, unknown> | null
+  const accessActive = Boolean(record.access_active)
+  const reviewStatus = String(review?.status ?? '')
+  const mayUpload = !review || reviewStatus === 'correction_required'
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [currentResponse, plansResponse] = await Promise.all([api.get('/subscription'), api.get('/subscription/plans')])
+      const current = currentResponse.data ?? {}
+      const loadedPartner = current.partner ?? {}
+      setRecord(current)
+      setPlan(plansResponse.data.data?.[0] ?? null)
+      setProfile({ business_name: String(loadedPartner.business_name ?? ''), license_number: String(loadedPartner.license_number ?? ''), address: String(loadedPartner.address ?? ''), latitude: String(loadedPartner.latitude ?? ''), longitude: String(loadedPartner.longitude ?? '') })
+    } catch (loadError) { setMessage(axios.isAxiosError(loadError) ? loadError.response?.data?.message ?? tr('unableToLoadSubscription', locale) : tr('unableToLoadSubscription', locale)) }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [])
+
+  const submitProof = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!proof || !plan?.amount || submitting) return
+    setSubmitting(true)
+    setMessage('')
+    const key = idempotencyKey.current ?? uniqueMutationId('web-payment-proof')
+    idempotencyKey.current = key
+    const data = new FormData()
+    data.append('amount', String(plan.amount))
+    data.append('plan_code', String(plan.code ?? ''))
+    data.append('proof', proof)
+    try {
+      const response = await api.post('/subscription/payment-proof', data, { headers: { 'Idempotency-Key': key } })
+      setMessage(response.data.message ?? 'Payment proof submitted for administrator review.')
+      setProof(null)
+      idempotencyKey.current = null
+      await load()
+    } catch (submitError) { setMessage(axios.isAxiosError(submitError) ? submitError.response?.data?.message ?? tr('uploadFailed', locale) : tr('uploadFailed', locale)) }
+    finally { setSubmitting(false) }
+  }
+  const submitProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setMessage('')
+    try { await api.patch('/subscription/profile', profile, mutationConfig('partner-profile', 'self', 'resubmit')); setMessage('Corrected organization details resubmitted for review.'); await load() }
+    catch (submitError) { setMessage(axios.isAxiosError(submitError) ? submitError.response?.data?.message ?? 'Unable to resubmit organization details.' : 'Unable to resubmit organization details.') }
+  }
+  const dateOnly = (value: unknown) => value ? new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(String(value))) : 'Not active yet'
+  const titleStatus = (value: unknown) => String(value ?? 'not active').replaceAll('_', ' ')
+
+  return <section className="content subscription-workspace"><div className="welcome-row"><div><p className="eyebrow">PARTNER ACCOUNT</p><h1>Subscription</h1><p className="muted">Review your access dates, payment review, and any administrator feedback.</p></div><span className={`subscription-access-badge ${accessActive ? 'is-active' : 'is-inactive'}`}>{accessActive ? 'Operational access active' : 'Operational access inactive'}</span></div>
+    <div className="subscription-summary-grid"><section className="panel subscription-status-card"><p className="eyebrow">CURRENT ACCESS</p><h2>{loading ? 'Loading...' : accessActive ? 'Active' : titleStatus(review?.status ?? partner?.approval_status)}</h2><div className="subscription-dates"><div><span>Start date</span><strong>{dateOnly(active?.starts_at)}</strong></div><div><span>End date</span><strong>{dateOnly(active?.ends_at)}</strong></div></div>{scheduled && <p className="subscription-note">Next period: {dateOnly(scheduled.starts_at)} – {dateOnly(scheduled.ends_at)}</p>}</section>
+      <section className="panel subscription-plan-card"><p className="eyebrow">ANNUAL PLAN</p><h2>{String(plan?.duration_months ?? 12)} months</h2><strong className="subscription-price">{formatMedlineMoney(plan?.amount, 'SYP', locale)}</strong><p className="muted">The exact configured amount must appear on the uploaded receipt.</p></section>
+      <section className="panel subscription-review-card"><p className="eyebrow">PAYMENT REVIEW</p><h2>{review ? titleStatus(review.status) : active ? 'No payment awaiting review' : 'Payment required'}</h2>{Boolean(payment?.review_note) && <div className="admin-review-note"><strong>Administrator comment</strong><span>{String(payment?.review_note)}</span></div>}<p className="muted">{reviewStatus === 'payment_under_review' ? 'Your receipt is with the administrator. No action is needed until the review is completed.' : reviewStatus === 'correction_required' ? 'Upload a corrected receipt below. The previous file will be replaced.' : active ? 'You may submit the next annual payment when ready.' : 'Submit a receipt to begin review.'}</p></section></div>
+    {partner?.approval_status === 'correction_required' && <section className="panel correction-panel"><div className="panel-heading"><div><p className="eyebrow">ORGANIZATION CORRECTION REQUIRED</p><h2>Update registration details</h2><p className="muted">Administrator comment: {String(partner.review_note ?? 'Please review and correct your organization details.')}</p></div></div><form className="registration-form correction-form" onSubmit={submitProfile}><div className="registration-grid"><label>Business name<input value={profile.business_name ?? ''} onChange={(event) => setProfile((current) => ({ ...current, business_name: event.target.value }))} required /></label><label>License number<input value={profile.license_number ?? ''} onChange={(event) => setProfile((current) => ({ ...current, license_number: event.target.value }))} required /></label><label className="registration-span-2">Registered address<input value={profile.address ?? ''} onChange={(event) => setProfile((current) => ({ ...current, address: event.target.value }))} required /></label></div><RegistrationMapPicker latitude={profile.latitude ?? ''} longitude={profile.longitude ?? ''} onChange={(latitude, longitude) => setProfile((current) => ({ ...current, latitude, longitude }))} /><button className="primary-button" type="submit">Resubmit organization details</button></form></section>}
+    {mayUpload && <section className={`panel payment-upload-panel ${reviewStatus === 'correction_required' ? 'needs-correction' : ''}`}><div className="panel-heading"><div><p className="eyebrow">{reviewStatus === 'correction_required' ? 'CORRECTED RECEIPT' : active ? 'RENEWAL PAYMENT' : 'PAYMENT RECEIPT'}</p><h2>{reviewStatus === 'correction_required' ? 'Replace the payment proof' : 'Submit payment for review'}</h2></div></div><form className="subscription-form" onSubmit={submitProof}><label>Exact amount (SYP)<input value={String(plan?.amount ?? '')} readOnly aria-readonly="true" /></label><label>Receipt file<input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setProof(event.target.files?.[0] ?? null)} required /><small className="field-help">JPG, PNG, or PDF, up to 10 MB.</small></label><button className="primary-button" type="submit" disabled={!proof || !plan?.amount || submitting}>{submitting ? 'Submitting...' : reviewStatus === 'correction_required' ? 'Resubmit corrected receipt' : 'Submit for administrator review'}</button></form></section>}
+    {message && <div className="form-message" role="status">{message}</div>}
+  </section>
+}
+
+void PartnerSubscriptionPageOld
+function PartnerSubscriptionPageOld({ locale }: { locale: string }) {
   const [subscription, setSubscription] = useState<Record<string, unknown> | null>(null)
   const [partner, setPartner] = useState<Record<string, unknown> | null>(null)
   const [correctionForm, setCorrectionForm] = useState<Record<string, string>>({})
@@ -690,15 +991,185 @@ function DriverProfilePanel({ driverId, onClose, onOpenOrder }: { driverId: numb
   return <section className="content driver-profile-content"><div className="welcome-row"><div><p className="eyebrow">DRIVER PROFILE</p><h1>{String(driver.name ?? 'Driver')}</h1><p className="muted">{String(driver.email ?? '')} · {String(driver.vehicle_type ?? 'Delivery vehicle')} · {String(driver.vehicle_plate ?? 'Plate not provided')}</p></div><button className="ghost-button" onClick={onClose}>Back to delivery</button></div><section className="panel driver-profile-card"><div className="driver-profile-identity"><span className="driver-avatar">{String(driver.name ?? 'D').slice(0, 1).toUpperCase()}</span><div><p className="eyebrow">DRIVER DETAILS</p><h2>{String(driver.name ?? 'Driver')}</h2><span className="driver-status"><i /> {driver.is_available ? 'Available for delivery' : 'Currently assigned'}</span></div></div><div className="driver-details driver-profile-details"><p><span>Vehicle</span><strong>{String(driver.vehicle_type ?? 'Not provided')}</strong></p><p><span>Plate</span><strong>{String(driver.vehicle_plate ?? 'Not provided')}</strong></p><p><span>Contact</span><strong>{String(driver.email ?? 'Not provided')}</strong></p><p><span>Approval</span><strong>{label(driver.approval_status)}</strong></p></div></section><section className="driver-trip-metrics"><div className="metric-card"><div className="metric-copy"><span>Total trips</span><strong>{String(summary.total ?? 0)}</strong></div></div><div className="metric-card"><div className="metric-copy"><span>Accepted</span><strong>{String(summary.accepted ?? 0)}</strong></div></div><div className="metric-card"><div className="metric-copy"><span>In progress</span><strong>{String(summary.in_progress ?? 0)}</strong></div></div><div className="metric-card"><div className="metric-copy"><span>Completed</span><strong>{String(summary.completed ?? 0)}</strong></div></div><div className="metric-card"><div className="metric-copy"><span>Cancelled / failed</span><strong>{Number(summary.cancelled ?? 0) + Number(summary.failed ?? 0)}</strong></div></div></section><section className="panel driver-trips-card"><div className="panel-heading"><div><p className="eyebrow">TRIP HISTORY</p><h2>All delivery trips</h2><p className="muted">Timing, estimate, and current outcome for every assigned trip.</p></div></div><div className="driver-trips-table"><div className="driver-trip-row driver-trip-head"><span>Trip</span><span>Status</span><span>Started</span><span>Duration</span><span>Estimate</span><span>Action</span></div>{trips.length === 0 ? <div className="state">No trips recorded for this driver.</div> : trips.map((trip) => <div className="driver-trip-row driver-trip-clickable" key={String(trip.id)} onClick={() => { if (trip.order_id && onOpenOrder) onOpenOrder(Number(trip.order_id)) }}><strong>{String(trip.order_public_id ?? trip.public_id ?? `Trip ${trip.id}`)}</strong><span><em className={`trip-status status-${statusClass(trip.status)}`}>{label(trip.status)}</em></span><span>{formatMedlineDate(trip.claimed_at ?? trip.created_at)}</span><span>{trip.duration_minutes ? `${String(trip.duration_minutes)}m` : '—'}</span><span>~{String(trip.estimated_minutes ?? 45)}m</span><button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); if (trip.order_id && onOpenOrder) onOpenOrder(Number(trip.order_id)) }}>View order</button></div>)}</div></section></section>
 }
 
+function OrderItemsDecisionPanel({ order, items, onUpdated, locale }: { order: Record<string, any>; items: Array<Record<string, any>>; onUpdated: () => Promise<void>; locale: string }) {
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [files, setFiles] = useState<Record<string, File | null>>({})
+  const [note, setNote] = useState('')
+  const [prescriptionNotes, setPrescriptionNotes] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [prescriptionBusy, setPrescriptionBusy] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ url: string; medicine: string } | null>(null)
+  const previewCloseButton = useRef<HTMLButtonElement>(null)
+  const previewTrigger = useRef<HTMLButtonElement | null>(null)
+  const role = (() => { try { return String(JSON.parse(localStorage.getItem('medline_user') ?? '{}').role ?? '') } catch { return '' } })()
+  const status = String(order.status ?? '')
+  const pharmacyCanDecide = role === 'pharmacy' && ['pending_pharmacy_review', 'prescription_review'].includes(status)
+  const decisionRecorded = ['partial_approval_required', 'partially_accepted', 'accepted', 'partial_offer_rejected', 'ready_for_delivery'].includes(status)
+
+  useEffect(() => {
+    setQuantities(Object.fromEntries(items.map((item) => {
+      const required = Boolean(item.prescription_required_snapshot ?? item.prescription_required)
+      const prescription = item.prescription as Record<string, unknown> | null
+      const eligible = !required || prescription?.status === 'approved'
+      return [String(item.id), eligible ? Number(item.quantity ?? 0) : 0]
+    })))
+  }, [order.id, status, items])
+  useEffect(() => {
+    if (!preview) return
+    previewCloseButton.current?.focus()
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreview(null) }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => { document.removeEventListener('keydown', closeOnEscape); URL.revokeObjectURL(preview.url); previewTrigger.current?.focus() }
+  }, [preview])
+
+  const decide = async (decision: 'accept' | 'partial' | 'reject') => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const payload = { decision, note: note || undefined, ...(decision === 'partial' ? { items: items.map((item) => ({ id: Number(item.id), accepted_quantity: Math.max(0, Math.min(Number(item.quantity), Number(quantities[String(item.id)] ?? 0))) })) } : {}) }
+      await api.post(`/partner/orders/${String(order.id)}/decision`, payload, mutationConfig('order-decision', String(order.id), decision))
+      setMessage(decision === 'partial' ? 'The partial approval was sent to the patient. Delivery will wait for their confirmation.' : `Order ${decision === 'accept' ? 'approved' : 'rejected'}.`)
+      await onUpdated()
+    } catch (error) {
+      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to save the order decision.' : 'Unable to save the order decision.')
+    } finally { setBusy(false) }
+  }
+  const decidePartialOffer = async (decision: 'approve' | 'reject') => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await api.post(`/orders/${String(order.id)}/partial-offer/decision`, { decision, ...(note ? { note } : {}) }, mutationConfig('partial-offer', String(order.id), decision))
+      setMessage(response.data.message ?? 'Decision saved.')
+      await onUpdated()
+    } catch (error) {
+      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to save your partial-offer decision.' : 'Unable to save your partial-offer decision.')
+    } finally { setBusy(false) }
+  }
+  const uploadPrescription = async (item: Record<string, any>) => {
+    const file = files[String(item.id)]
+    if (!file) return
+    setBusy(true)
+    setMessage('')
+    const form = new FormData()
+    form.append('prescription', file)
+    try {
+      await api.post(`/orders/${String(order.id)}/items/${String(item.id)}/prescription`, form, { headers: mutationConfig('item-prescription', String(item.id), uniqueMutationId('resubmit')).headers })
+      setMessage(`Prescription for ${String(item.name_en)} submitted.`)
+      setFiles((current) => ({ ...current, [String(item.id)]: null }))
+      await onUpdated()
+    } catch (error) {
+      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to upload the prescription.' : 'Unable to upload the prescription.')
+    } finally { setBusy(false) }
+  }
+  const openPrescription = async (item: Record<string, any>, prescription: Record<string, unknown>, trigger: HTMLButtonElement) => {
+    const prescriptionId = String(prescription.id ?? '')
+    if (!prescriptionId) return
+    setPrescriptionBusy(`preview:${prescriptionId}`)
+    previewTrigger.current = trigger
+    setMessage('')
+    try {
+      const ticket = await api.get(`/prescriptions/${prescriptionId}/download-url`)
+      const response = await api.get(String(ticket.data.url), { responseType: 'blob' })
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
+      setPreview({ url: URL.createObjectURL(blob), medicine: String(item.name_en ?? 'Prescription medicine') })
+    } catch (error) {
+      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to open this prescription.' : 'Unable to open this prescription.')
+    } finally { setPrescriptionBusy(null) }
+  }
+  const reviewPrescription = async (item: Record<string, any>, prescription: Record<string, unknown>, decision: 'approve' | 'reject') => {
+    const prescriptionId = String(prescription.id ?? '')
+    const reviewNote = String(prescriptionNotes[prescriptionId] ?? '').trim()
+    if (decision === 'reject' && !reviewNote) { setMessage(`Add a rejection reason for ${String(item.name_en ?? 'this medicine')}.`); return }
+    setPrescriptionBusy(`review:${prescriptionId}`)
+    setMessage('')
+    try {
+      await api.post(`/pharmacy/prescriptions/${prescriptionId}/review`, { decision, ...(reviewNote ? { note: reviewNote } : {}) }, mutationConfig('prescription-review', prescriptionId, decision))
+      setMessage(`Prescription for ${String(item.name_en ?? 'medicine')} ${decision === 'approve' ? 'approved' : 'rejected'}.`)
+      await onUpdated()
+    } catch (error) {
+      setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to review this prescription.' : 'Unable to review this prescription.')
+    } finally { setPrescriptionBusy(null) }
+  }
+
+  const selectedUnits = items.reduce((sum, item) => sum + Number(quantities[String(item.id)] ?? 0), 0)
+  const requestedUnits = items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)
+  const partialSelectionValid = selectedUnits > 0 && selectedUnits < requestedUnits
+
+  return <section className="panel order-items-decision-card">
+    <div className="panel-heading"><div><p className="eyebrow">MEDICINES &amp; PRESCRIPTIONS</p><h2>Review this order medicine by medicine</h2><p className="muted">Open each prescription document separately, record its decision, then approve all or part of the order.</p></div><span className="order-item-count">{items.length} {items.length === 1 ? 'medicine' : 'medicines'}</span></div>
+    {order.partial_offer_note && <div className="partial-offer-note"><strong>Pharmacy note</strong><span>{String(order.partial_offer_note)}</span></div>}
+    <div className="order-detail-items">
+      <div className="order-detail-item order-detail-item-head"><span>Medicine</span><span>Requested</span><span>Quantity to fulfil</span><span>Prescription document</span><span>Outcome</span></div>
+      {items.map((item) => {
+        const prescription = item.prescription as Record<string, unknown> | null
+        const required = Boolean(item.prescription_required_snapshot ?? item.prescription_required)
+        const accepted = Number(item.accepted_quantity ?? 0)
+        const requested = Number(item.quantity ?? 0)
+        const selected = Number(quantities[String(item.id)] ?? 0)
+        const prescriptionStatus = String(prescription?.status ?? 'missing')
+        const eligible = !required || prescriptionStatus === 'approved'
+        const outcome = decisionRecorded ? (accepted === 0 ? 'Not included' : accepted < requested ? 'Partially accepted' : 'Accepted') : pharmacyCanDecide ? (selected === 0 ? 'Not selected' : selected < requested ? 'Partial selection' : 'Selected') : 'Awaiting pharmacy'
+        const prescriptionId = String(prescription?.id ?? '')
+        return <div className={`order-detail-item ${decisionRecorded && accepted === 0 ? 'ignored' : ''}`} key={String(item.id)}>
+          <button type="button" className="order-item-medicine" onClick={() => openMedicineDetail(Number(item.medicine_id))}><strong>{String(item.name_en ?? `Medicine ${item.medicine_id}`)}</strong><small>{String(item.dosage ?? item.form ?? item.manufacturer ?? '')}</small></button>
+          <span>{requested}</span>
+          <span>{pharmacyCanDecide ? <span className="fulfil-quantity"><input aria-label={`Quantity to fulfil for ${String(item.name_en)}`} type="number" min="0" max={requested} value={selected} disabled={!eligible || busy || prescriptionBusy !== null} onChange={(event) => setQuantities((current) => ({ ...current, [String(item.id)]: Math.max(0, Math.min(requested, Number(event.target.value))) }))} />{!eligible && <small>Approve the prescription first</small>}</span> : decisionRecorded ? accepted : '—'}</span>
+          <div className="order-prescription-review">
+            {required ? <em className={`item-prescription-status status-${prescriptionStatus}`}>{prescriptionStatus.replaceAll('_', ' ')}</em> : <em className="item-prescription-status status-not-required">Not required</em>}
+            {required && prescription && <button type="button" className="prescription-view-button" disabled={prescriptionBusy !== null} onClick={(event) => void openPrescription(item, prescription, event.currentTarget)}><Eye size={16} aria-hidden="true" />{prescriptionBusy === `preview:${prescriptionId}` ? 'Opening…' : 'View document'}</button>}
+            {required && !prescription && <small className="prescription-awaiting-copy">Waiting for the patient to upload this document.</small>}
+            {required && Boolean(prescription?.review_note) && <small className="prescription-review-note">Review note: {String(prescription?.review_note)}</small>}
+            {role === 'pharmacy' && prescriptionStatus === 'pending_review' && prescription && <div className="prescription-inline-decision">
+              <label><span>Pharmacist note <small>Required to reject</small></span><textarea aria-label={`Pharmacist note for ${String(item.name_en)}`} value={prescriptionNotes[prescriptionId] ?? ''} onChange={(event) => setPrescriptionNotes((current) => ({ ...current, [prescriptionId]: event.target.value }))} maxLength={1000} /></label>
+              <div className="row-actions"><button type="button" className="approve-button" disabled={prescriptionBusy !== null || busy} onClick={() => void reviewPrescription(item, prescription, 'approve')}><FileCheck2 size={15} aria-hidden="true" /> Approve</button><button type="button" className="reject-button" disabled={prescriptionBusy !== null || busy} onClick={() => void reviewPrescription(item, prescription, 'reject')}><FileX2 size={15} aria-hidden="true" /> Reject</button></div>
+            </div>}
+            {role === 'patient' && required && ['prescription_required', 'prescription_review'].includes(status) && (!prescription || prescription.status === 'rejected') && <span className="order-item-prescription-upload"><input aria-label={`Prescription for ${String(item.name_en)}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setFiles((current) => ({ ...current, [String(item.id)]: event.target.files?.[0] ?? null }))} /><button type="button" className="ghost-button" disabled={!files[String(item.id)] || busy} onClick={() => void uploadPrescription(item)}>Upload</button></span>}
+          </div>
+          <span className={`item-outcome ${outcome === 'Not included' || outcome === 'Not selected' ? 'not-included' : ''}`}>{outcome}</span>
+        </div>
+      })}
+    </div>
+    {pharmacyCanDecide && <div className="partial-decision-controls"><div className="order-decision-heading"><strong>Order decision</strong><span>Adjust the quantity for each eligible medicine before approving partially.</span></div><label>Note to patient<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Explain unavailable quantities or excluded medicines" maxLength={1000} /></label><div className="row-actions">{status === 'pending_pharmacy_review' && <button type="button" className="approve-button" disabled={busy || prescriptionBusy !== null} onClick={() => void decide('accept')}>Approve all</button>}<button type="button" className="correction-button" aria-describedby="partial-decision-hint" disabled={busy || prescriptionBusy !== null || !partialSelectionValid} onClick={() => void decide('partial')}>Approve partially</button><button type="button" className="reject-button" disabled={busy || prescriptionBusy !== null} onClick={() => void decide('reject')}>Reject order</button></div><small id="partial-decision-hint">Partial approval requires at least one selected and one excluded unit. It is sent to the patient first, and no delivery is created until they accept it.</small></div>}
+    {role === 'patient' && status === 'partial_approval_required' && <div className="patient-partial-decision"><div><strong>The pharmacy offered part of your order.</strong><span>Review every accepted and excluded quantity above. Delivery starts only if you approve.</span></div><label>Optional note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} /></label><div className="row-actions"><button type="button" className="approve-button" disabled={busy} onClick={() => void decidePartialOffer('approve')}>Approve partial order</button><button type="button" className="reject-button" disabled={busy} onClick={() => void decidePartialOffer('reject')}>Decline offer</button></div></div>}
+    {message && <div className="form-message" role="status">{message}</div>}
+    <div className="order-item-totals"><span>Originally requested <strong>{formatMedlineMoney(items.reduce((sum, item) => sum + Number(item.requested_line_total ?? item.line_total ?? 0), 0), 'SYP', locale)}</strong></span>{decisionRecorded && <span>Accepted medicines <strong>{formatMedlineMoney(items.reduce((sum, item) => sum + Number(item.accepted_line_total ?? 0), 0), 'SYP', locale)}</strong></span>}</div>
+    {preview && <div className="prescription-viewer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null) }}><section className="prescription-viewer" role="dialog" aria-modal="true" aria-labelledby="prescription-viewer-title"><header><div><p className="eyebrow">PRIVATE PRESCRIPTION</p><h2 id="prescription-viewer-title">{preview.medicine}</h2></div><button ref={previewCloseButton} type="button" aria-label="Close prescription viewer" onClick={() => setPreview(null)}><X size={20} aria-hidden="true" /></button></header><iframe title={`Prescription for ${preview.medicine}`} src={preview.url} /><p>Only authorized pharmacy staff, the patient, and administrators can access this document.</p></section></div>}
+  </section>
+}
+
+function OrderItemsDecisionPanelLegacy2({ order, items, onUpdated, locale }: { order: Record<string, any>; items: Array<Record<string, any>>; onUpdated: () => Promise<void>; locale: string }) {
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [files, setFiles] = useState<Record<string, File | null>>({})
+  const [note, setNote] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const role = (() => { try { return String(JSON.parse(localStorage.getItem('medline_user') ?? '{}').role ?? '') } catch { return '' } })()
+  const status = String(order.status ?? '')
+  useEffect(() => setQuantities(Object.fromEntries(items.map((item) => [String(item.id), Number(item.quantity ?? 0)]))), [order.id, items.length])
+  const decide = async (decision: 'accept' | 'partial' | 'reject') => { setBusy(true); setMessage(''); try { const payload = { decision, note: note || undefined, ...(decision === 'partial' ? { items: items.map((item) => ({ id: Number(item.id), accepted_quantity: Math.max(0, Math.min(Number(item.quantity), Number(quantities[String(item.id)] ?? 0))) })) } : {}) }; await api.post(`/partner/orders/${String(order.id)}/decision`, payload, mutationConfig('order-decision', String(order.id), decision)); setMessage(decision === 'partial' ? 'Partial offer sent to the patient for approval. Delivery has not started.' : `Order ${decision === 'accept' ? 'accepted' : 'rejected'}.`); await onUpdated() } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to save the order decision.' : 'Unable to save the order decision.') } finally { setBusy(false) } }
+  const decidePartialOffer = async (decision: 'approve' | 'reject') => { setBusy(true); setMessage(''); try { const response = await api.post(`/orders/${String(order.id)}/partial-offer/decision`, { decision, ...(note ? { note } : {}) }, mutationConfig('partial-offer', String(order.id), decision)); setMessage(response.data.message ?? 'Decision saved.'); await onUpdated() } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to save your partial-offer decision.' : 'Unable to save your partial-offer decision.') } finally { setBusy(false) } }
+  const uploadPrescription = async (item: Record<string, any>) => { const file = files[String(item.id)]; if (!file) return; setBusy(true); setMessage(''); const form = new FormData(); form.append('prescription', file); try { await api.post(`/orders/${String(order.id)}/items/${String(item.id)}/prescription`, form, { headers: mutationConfig('item-prescription', String(item.id), uniqueMutationId('resubmit')).headers }); setMessage(`Prescription for ${String(item.name_en)} submitted.`); setFiles((current) => ({ ...current, [String(item.id)]: null })); await onUpdated() } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to upload the prescription.' : 'Unable to upload the prescription.') } finally { setBusy(false) } }
+  const decisionRecorded = ['partial_approval_required', 'partially_accepted', 'accepted', 'partial_offer_rejected', 'ready_for_delivery'].includes(status)
+  // @ts-expect-error The guarded optional review note is stringified before rendering; the dynamic API record prevents JSX from narrowing it.
+  return <section className="panel order-items-decision-card"><div className="panel-heading"><div><p className="eyebrow">MEDICINES</p><h2>Requested and accepted items</h2><p className="muted">Every requested item remains visible, including quantities that the pharmacy could not fulfil.</p></div><span className="order-item-count">{items.length} {items.length === 1 ? 'medicine' : 'medicines'}</span></div>{order.partial_offer_note && <div className="partial-offer-note"><strong>Pharmacy note</strong><span>{String(order.partial_offer_note)}</span></div>}<div className="order-detail-items"><div className="order-detail-item order-detail-item-head"><span>Medicine</span><span>Requested</span><span>Offered / accepted</span><span>Prescription</span><span>Outcome</span></div>{items.map((item) => { const prescription = item.prescription as Record<string, unknown> | null; const required = Boolean(item.prescription_required_snapshot ?? item.prescription_required); const accepted = Number(item.accepted_quantity ?? 0); const requested = Number(item.quantity ?? 0); const outcome = !decisionRecorded ? 'Awaiting pharmacy' : accepted === 0 ? 'Not included' : accepted < requested ? 'Partially accepted' : 'Accepted'; return <div className={`order-detail-item ${decisionRecorded && accepted === 0 ? 'ignored' : ''}`} key={String(item.id)}><button type="button" className="order-item-medicine" onClick={() => openMedicineDetail(Number(item.medicine_id))}><strong>{String(item.name_en ?? `Medicine ${item.medicine_id}`)}</strong><small>{String(item.dosage ?? item.form ?? item.manufacturer ?? '')}</small></button><span>{requested}</span><span>{role === 'pharmacy' && status === 'pending_pharmacy_review' ? <input aria-label={`Accepted quantity for ${String(item.name_en)}`} type="number" min="0" max={requested} value={quantities[String(item.id)] ?? requested} onChange={(event) => setQuantities((current) => ({ ...current, [String(item.id)]: Number(event.target.value) }))} /> : decisionRecorded ? accepted : '—'}</span><span>{required ? <em className={`item-prescription-status status-${String(prescription?.status ?? 'missing')}`}>{String(prescription?.status ?? 'Missing').replaceAll('_', ' ')}</em> : <em className="item-prescription-status status-not-required">Not required</em>}{required && prescription?.review_note && <small className="prescription-review-note">{String(prescription.review_note)}</small>}{role === 'patient' && required && ['prescription_required', 'prescription_review'].includes(status) && (!prescription || prescription.status === 'rejected') && <span className="order-item-prescription-upload"><input aria-label={`Prescription for ${String(item.name_en)}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setFiles((current) => ({ ...current, [String(item.id)]: event.target.files?.[0] ?? null }))} /><button type="button" className="ghost-button" disabled={!files[String(item.id)] || busy} onClick={() => void uploadPrescription(item)}>Upload</button></span>}</span><span className={`item-outcome ${outcome === 'Not included' ? 'not-included' : ''}`}>{outcome}</span></div> })}</div>{role === 'pharmacy' && status === 'pending_pharmacy_review' && <div className="partial-decision-controls"><label>Note to patient<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Explain unavailable quantities or substitutions" maxLength={1000} /></label><div className="row-actions"><button type="button" className="approve-button" disabled={busy} onClick={() => void decide('accept')}>Accept all</button><button type="button" className="correction-button" disabled={busy} onClick={() => void decide('partial')}>Send partial offer</button><button type="button" className="reject-button" disabled={busy} onClick={() => void decide('reject')}>Reject order</button></div><small>Partial offers require patient approval before any delivery is created.</small></div>}{role === 'patient' && status === 'partial_approval_required' && <div className="patient-partial-decision"><div><strong>The pharmacy offered part of your order.</strong><span>Review every accepted and excluded quantity above. Delivery starts only if you approve.</span></div><label>Optional note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} /></label><div className="row-actions"><button type="button" className="approve-button" disabled={busy} onClick={() => void decidePartialOffer('approve')}>Approve partial order</button><button type="button" className="reject-button" disabled={busy} onClick={() => void decidePartialOffer('reject')}>Decline offer</button></div></div>}{message && <div className="form-message" role="status">{message}</div>}<div className="order-item-totals"><span>Originally requested <strong>{formatMedlineMoney(items.reduce((sum, item) => sum + Number(item.requested_line_total ?? item.line_total ?? 0), 0), 'SYP', locale)}</strong></span>{decisionRecorded && <span>Accepted medicines <strong>{formatMedlineMoney(items.reduce((sum, item) => sum + Number(item.accepted_line_total ?? 0), 0), 'SYP', locale)}</strong></span>}</div></section>
+}
+
+void OrderItemsDecisionPanelLegacy2
+
 export function OrderDetailPanel({ detail, onClose, locale }: { detail: Record<string, unknown>; onClose: () => void; locale: string }) {
+  const [currentDetail, setCurrentDetail] = useState(detail)
   const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null)
   const [tripOrder, setTripOrder] = useState<Record<string, unknown> | null>(null)
-  const order = (detail.order ?? {}) as Record<string, unknown>
-  const delivery = (detail.delivery ?? {}) as Record<string, unknown>
+  useEffect(() => setCurrentDetail(detail), [detail])
+  const order = (currentDetail.order ?? {}) as Record<string, unknown>
+  const delivery = (currentDetail.delivery ?? {}) as Record<string, unknown>
   const driver = (delivery.driver ?? {}) as Record<string, unknown>
-  const route = (detail.route ?? {}) as Record<string, unknown>
-  const invoice = (detail.invoice ?? {}) as Record<string, unknown>
-  const timeline = Array.isArray(detail.timeline) ? detail.timeline as Array<Record<string, unknown>> : []
+  const route = (currentDetail.route ?? {}) as Record<string, unknown>
+  const invoice = (currentDetail.invoice ?? {}) as Record<string, unknown>
+  const timeline = Array.isArray(currentDetail.timeline) ? currentDetail.timeline as Array<Record<string, unknown>> : []
+  const items = Array.isArray(order.items) ? order.items as Array<Record<string, any>> : []
+  const refresh = async () => { const response = await api.get(`/orders/${String(order.id)}`); setCurrentDetail(response.data) }
   const amount = (key: string) => formatMedlineMoney(invoice[key] ?? order[key] ?? 0, 'SYP', locale)
   const currentStatus = String(delivery.status ?? order.status ?? 'pending')
   const statusLabel = (value: string) => value.replaceAll('_', ' ')
@@ -707,12 +1178,13 @@ export function OrderDetailPanel({ detail, onClose, locale }: { detail: Record<s
   const deliveryDuration = formatDeliveryDuration(timeline, delivery.completed_at ?? delivery.location_updated_at)
   if (tripOrder) return <OrderDetailPanel detail={tripOrder} onClose={() => setTripOrder(null)} locale={locale} />
   if (selectedDriverId) return <DriverProfilePanel driverId={selectedDriverId} onClose={() => setSelectedDriverId(null)} onOpenOrder={(orderId) => { void api.get(`/orders/${orderId}`).then((response) => setTripOrder(response.data)).catch(() => setTripOrder({ error: 'Unable to load order details.' })) }} />
-  if (detail.error) return <section className="content"><button className="ghost-button" onClick={onClose}>Back to queue</button><div className="form-error">{String(detail.error)}</div></section>
+  if (currentDetail.error) return <section className="content"><button className="ghost-button" onClick={onClose}>Back to queue</button><div className="form-error">{String(currentDetail.error)}</div></section>
   return <section className="content order-detail-content">
     <div className="welcome-row"><div><p className="eyebrow">{locale === 'ar' ? '— · · · · ·? · — · · · · —' : 'ORDER DETAIL'}</p><h1>{String(order.public_id ?? order.id ?? 'Order')}</h1><div className="order-meta"><span className={`order-status status-${currentStatus.replaceAll('_', '-')}`}><i />{readableStatus}</span><span className="muted">{formatMedlineDate(order.created_at, locale)}</span></div></div><button className="ghost-button" onClick={onClose}>{locale === 'ar' ? '— · · · ·? — · · · · · · · · · · · —' : 'Back to queue'}</button></div>
     <div className="order-detail-grid">
       <section className="panel invoice-card"><div className="panel-heading"><div><p className="eyebrow">{locale === 'ar' ? '— · · · · · ·? — · —' : 'INVOICE'}</p><h2>{locale === 'ar' ? '— · · · · · · · · —' : 'Order summary'}</h2></div><span className="detail-total">{amount('total')}</span></div><div className="invoice-lines"><p><span>Subtotal</span><strong>{amount('subtotal')}</strong></p><p><span>Delivery fee</span><strong>{amount('delivery_fee')}</strong></p><p className="invoice-grand-total"><span>Total</span><strong>{amount('total')}</strong></p></div><div className="payment-line"><span>Payment method</span><strong className="payment-pill"><CreditCard size={14} />{paymentMethod}</strong></div></section>
       <section className="panel driver-card driver-card-clickable" role="button" tabIndex={0} onClick={() => Number(driver.driver_id ?? delivery.driver_id) > 0 && setSelectedDriverId(Number(driver.driver_id ?? delivery.driver_id))} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); Number(driver.driver_id ?? delivery.driver_id) > 0 && setSelectedDriverId(Number(driver.driver_id ?? delivery.driver_id)) } }}><div className="panel-heading"><div><p className="eyebrow">DRIVER</p><h2>{driver.name ? String(driver.name) : 'Awaiting driver assignment'}</h2></div><span className="driver-avatar">{driver.name ? String(driver.name).slice(0, 1).toUpperCase() : '?'}</span></div>{driver.name ? <><div className="driver-status"><i /> {driver.is_available ? 'Available for delivery' : 'Assigned to delivery'}</div><div className="driver-details"><p><span>Vehicle</span><strong>{String(driver.vehicle_type ?? 'Delivery vehicle')}</strong></p><p><span>Plate</span><strong>{String(driver.vehicle_plate ?? 'Not provided')}</strong></p><p><span>Contact</span><strong>{String(driver.email ?? 'Not provided')}</strong></p></div><span className="driver-view-hint">View driver profile and trip history — ·? ?</span></> : <p className="muted">The driver details will appear here after a driver claims this delivery.</p>}</section>
+      <OrderItemsDecisionPanel order={order} items={items} onUpdated={refresh} locale={locale} />
       <RouteMap route={route} />
       <section className="panel timeline-card"><div className="panel-heading"><div><p className="eyebrow">DELIVERY TIMELINE</p><h2>Delivery progress</h2></div><div className="timeline-heading-right"><span className={`order-status status-${currentStatus.replaceAll('_', '-')}`}><i />{statusLabel(currentStatus).replace(/\b\w/g, (letter) => letter.toUpperCase())}</span><div className="timeline-summary"><span>Total delivery time</span><strong>{deliveryDuration}</strong></div></div></div>{timeline.length === 0 ? <div className="state">No delivery events recorded yet.</div> : <div className="step-timeline">{timeline.map((event, index) => <div className={`timeline-step ${index === timeline.length - 1 ? 'current' : 'complete'}`} key={String(event.id ?? index)}><div className="step-marker">{index + 1}</div><div className="step-content"><strong>{statusLabel(String(event.to_status ?? 'Updated'))}</strong><span>{formatMedlineDate(event.created_at, locale)}</span>{Boolean(event.note) && <small>{String(event.note)}</small>}</div></div>)}</div>}</section>
     </div>
@@ -749,7 +1221,7 @@ export function DeliveryDetailPanel({ detail, onClose, locale }: { detail: Recor
   const terminal = ['delivered', 'failed', 'cancelled'].includes(String(delivery.status))
   if (selectedDriverId) return <DriverProfilePanel driverId={selectedDriverId} onClose={() => setSelectedDriverId(null)} />
   return <DeliveryDetailPresentation delivery={delivery} driver={driver} events={events} route={route} mapUrl={mapUrl} terminal={terminal} onClose={onClose} onDriverClick={() => Number(driver.driver_id ?? delivery.driver_id) > 0 && setSelectedDriverId(Number(driver.driver_id ?? delivery.driver_id))} text={text} />
-  return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{text('deliveryDetail')}</p><h1>{String(delivery.public_id ?? delivery.id ?? 'Delivery')}</h1><p className="muted">{String(delivery.status ?? 'unknown').replaceAll('_', ' ')} · {String(delivery.completed_at ?? delivery.claimed_at ?? '')}</p></div><button className="ghost-button" onClick={onClose}>{text('backToDeliveries')}</button></div><div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('assignment')}</p><h2>{String(delivery.order_public_id ?? delivery.procurement_public_id ?? text('operationalDelivery'))}</h2></div></div><p>{text('address')}: {String(delivery.delivery_address_snapshot ?? text('privateAddress'))}</p><p>{text('total')}: {String(delivery.total ?? '0.00')}</p><p className="muted">{text('driverAssignment')}: {delivery.driver_id ? text('assigned') : text('awaitingDriver')}</p></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('liveLocation')}</p><h2>{text('driverLocation')}</h2></div></div>{mapUrl && !terminal ? <div><p>{text('latestActivePosition')}</p><p className="muted">{text('updated')}: {String(delivery.location_updated_at ?? text('pending'))}</p><iframe className="delivery-map" title={text('driverLocation')} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" allowFullScreen /><a className="ghost-button" href={`https://www.openstreetmap.org/?mlat=${String(delivery.last_latitude)}&mlon=${String(delivery.last_longitude)}&zoom=15`} target="_blank" rel="noreferrer">{text('openMap')}</a></div> : <div className="state">{text('locationActiveOnly')}</div>}</section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('eventTimeline')}</p><h2>{text('deliveryProgress')}</h2></div></div>{events.length === 0 ? <div className="state">{text('noDeliveryEvents')}</div> : events.map((event, index) => <div className="activity-item" key={`${String(event.id ?? index)}`}><div className="activity-icon blue">{index + 1}</div><div><strong>{String(event.to_status ?? 'Updated').replaceAll('_', ' ')}</strong><span>{String(event.created_at ?? '')}</span></div></div>)}</section></div></section>
+  return <section className="content"><div className="welcome-row"><div><p className="eyebrow">{text('deliveryDetail')}</p><h1>{String(delivery.public_id ?? delivery.id ?? 'Delivery')}</h1><p className="muted">{String(delivery.status ?? 'unknown').replaceAll('_', ' ')} · {String(delivery.completed_at ?? delivery.claimed_at ?? '')}</p></div><button className="ghost-button" onClick={onClose}>{text('backToDeliveries')}</button></div><div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('assignment')}</p><h2>{String(delivery.order_public_id ?? delivery.procurement_public_id ?? text('operationalDelivery'))}</h2></div></div><p>{text('address')}: {String(delivery.delivery_address_snapshot ?? text('privateAddress'))}</p><p>{text('total')}: {String(delivery.total ?? '0.00')}</p><p className="muted">{text('driverAssignment')}: {delivery.driver_id ? text('assigned') : text('awaitingDriver')}</p></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('liveLocation')}</p><h2>{text('driverLocation')}</h2></div></div>{mapUrl && !terminal ? <div><p>{text('latestActivePosition')}</p><p className="muted">{text('updated')}: {String(delivery.location_updated_at ?? text('pending'))}</p><iframe className="delivery-map" title={text('driverLocation')} src={mapUrl ?? undefined} loading="lazy" referrerPolicy="no-referrer" allowFullScreen /><a className="ghost-button" href={`https://www.openstreetmap.org/?mlat=${String(delivery.last_latitude)}&mlon=${String(delivery.last_longitude)}&zoom=15`} target="_blank" rel="noreferrer">{text('openMap')}</a></div> : <div className="state">{text('locationActiveOnly')}</div>}</section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">{text('eventTimeline')}</p><h2>{text('deliveryProgress')}</h2></div></div>{events.length === 0 ? <div className="state">{text('noDeliveryEvents')}</div> : events.map((event, index) => <div className="activity-item" key={`${String(event.id ?? index)}`}><div className="activity-icon blue">{index + 1}</div><div><strong>{String(event.to_status ?? 'Updated').replaceAll('_', ' ')}</strong><span>{String(event.created_at ?? '')}</span></div></div>)}</section></div></section>
 }
 
 function LegacyComplaintDetailPanel({ detail, onClose }: { detail: Record<string, unknown>; onClose: () => void }) {
@@ -822,12 +1294,16 @@ function CustomerOrderMap({ pharmacies, selectedPharmacy, deliveryPoint, onPharm
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
   const deliveryMarkerRef = useRef<L.Marker | null>(null)
+  const selectedPharmacyRef = useRef(selectedPharmacy)
+  const deliverySelectRef = useRef(onDeliverySelect)
+  selectedPharmacyRef.current = selectedPharmacy
+  deliverySelectRef.current = onDeliverySelect
   const center: L.LatLngExpression = [33.5138, 36.2765]
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return
     const map = L.map(mapElement.current, { zoomControl: true }).setView(center, 12)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map)
-    map.on('click', (event) => onDeliverySelect(event.latlng.lat, event.latlng.lng))
+    map.on('click', (event) => { if (selectedPharmacyRef.current) deliverySelectRef.current(event.latlng.lat, event.latlng.lng) })
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -851,10 +1327,156 @@ function CustomerOrderMap({ pharmacies, selectedPharmacy, deliveryPoint, onPharm
     deliveryMarkerRef.current?.remove()
     deliveryMarkerRef.current = L.marker([deliveryPoint.latitude, deliveryPoint.longitude], { title: 'Delivery address' }).addTo(map).bindPopup('<strong>Delivery address</strong>').openPopup()
   }, [deliveryPoint])
-  return <div className="customer-order-map-wrap"><div ref={mapElement} className="customer-order-map" /><div className="map-instruction"><span>1</span> Select a pharmacy marker, then click anywhere on the map to pin your delivery address.</div>{selectedPharmacy && <div className="map-selection-card"><strong>{String(selectedPharmacy.business_name)}</strong><span>{String(selectedPharmacy.address ?? 'Approved pharmacy')}</span></div>}</div>
+  return <div className="customer-order-map-wrap"><div ref={mapElement} className="customer-order-map" /><div className="map-instruction"><span>{selectedPharmacy ? '3' : '1'}</span>{!selectedPharmacy ? 'Select a pharmacy marker to continue.' : deliveryPoint ? 'Delivery location pinned. Click elsewhere to change it.' : 'Now click the map to pin the delivery location.'}</div>{selectedPharmacy && <div className="map-selection-card"><strong>{String(selectedPharmacy.business_name)}</strong><span>{String(selectedPharmacy.address ?? 'Approved pharmacy')}</span></div>}</div>
 }
 
-function PatientOrderCreatePanel({ locale: _locale }: { locale: string }) {
+function NewOrderPage({ locale, onBack }: { locale: string; onBack: () => void }) {
+  return <section className="content new-order-page"><div className="new-order-page-nav"><button type="button" className="ghost-button" onClick={onBack}><ChevronRight className="back-chevron" size={16} aria-hidden="true" /> Back to orders</button></div><PatientOrderCreatePanel locale={locale} /></section>
+}
+
+function PatientOrderCreatePanel({ locale }: { locale: string }) {
+  void locale
+  const [pharmacies, setPharmacies] = useState<Array<Record<string, unknown>>>([])
+  const [medicines, setMedicines] = useState<Array<Record<string, unknown>>>([])
+  const [selectedPharmacy, setSelectedPharmacy] = useState<Record<string, unknown> | null>(null)
+  const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [medicineSearch, setMedicineSearch] = useState('')
+  const [medicineId, setMedicineId] = useState('')
+  const [quantity, setQuantity] = useState('1')
+  const [items, setItems] = useState<Array<{ medicine: Record<string, any>; quantity: number; prescription: File | null }>>([])
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const mapSection = useRef<HTMLElement>(null)
+
+  useEffect(() => { api.get('/partners', { params: { type: 'pharmacy', per_page: 100 } }).then((response) => setPharmacies(response.data.data ?? [])).catch(() => setMessage('Unable to load approved pharmacies.')) }, [])
+  const medicineOptionLabel = (medicine: Record<string, unknown>) => [String(medicine.name_en ?? 'Medicine'), medicine.dosage ? String(medicine.dosage) : '', medicine.manufacturer ? String(medicine.manufacturer) : ''].filter(Boolean).join(' · ')
+  const selectPharmacy = (pharmacy: Record<string, unknown>) => {
+    setSelectedPharmacy(pharmacy)
+    setItems([])
+    setMedicineId('')
+    setMedicineSearch('')
+    setMedicines([])
+    setMessage('')
+    api.get('/medicines', { params: { available_only: true, partner_id: Number(pharmacy.id), per_page: 100 } }).then((response) => setMedicines(response.data.data ?? [])).catch(() => setMessage('Unable to load medicines for this pharmacy.'))
+  }
+  const updateMedicineSearch = (value: string) => {
+    setMedicineSearch(value)
+    const exactMatch = medicines.find((medicine) => medicineOptionLabel(medicine).toLocaleLowerCase() === value.toLocaleLowerCase())
+    setMedicineId(exactMatch ? String(exactMatch.id) : '')
+  }
+  const addMedicine = () => {
+    const medicine = medicines.find((entry) => String(entry.id) === medicineId)
+    const count = Math.max(1, Math.min(100, Number(quantity) || 1))
+    if (!medicine) return
+    setItems((current) => {
+      const existing = current.find((item) => item.medicine.id === medicine.id)
+      return existing ? current.map((item) => item.medicine.id === medicine.id ? { ...item, quantity: Math.min(100, item.quantity + count) } : item) : [...current, { medicine, quantity: count, prescription: null }]
+    })
+    setMedicineId('')
+    setMedicineSearch('')
+    setQuantity('1')
+  }
+  const missingPrescription = items.some((item) => Boolean(item.medicine.prescription_required) && !item.prescription)
+  const currentStep = !selectedPharmacy ? 1 : items.length === 0 ? 2 : !deliveryPoint ? 3 : 4
+  const stepState = (step: number) => currentStep > step ? 'complete' : currentStep === step ? 'current' : 'upcoming'
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedPharmacy || !deliveryPoint || items.length === 0) { setMessage('Select a pharmacy, add at least one medicine, and pin the delivery location.'); return }
+    if (missingPrescription) { setMessage('Upload a separate prescription for every medicine marked as prescription required.'); return }
+    setSubmitting(true)
+    setMessage('')
+    try {
+      const response = await api.post('/orders', { pharmacy_id: Number(selectedPharmacy.id), delivery_address_snapshot: `Pinned map location (${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)})`, items: items.map((item) => ({ medicine_id: Number(item.medicine.id), quantity: item.quantity })) }, mutationConfig('patient-order', uniqueMutationId('patient-order'), 'create'))
+      const order = response.data.order ?? response.data
+      const createdItems = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : []
+      for (const selected of items.filter((item) => item.prescription)) {
+        const created = createdItems.find((item) => Number(item.medicine_id) === Number(selected.medicine.id))
+        if (!created) throw new Error('Created order item could not be matched to its prescription.')
+        const form = new FormData()
+        form.append('prescription', selected.prescription as File)
+        await api.post(`/orders/${String(order.id)}/items/${String(created.id)}/prescription`, form, { headers: mutationConfig('item-prescription', created.id as number, 'upload').headers })
+      }
+      setItems([])
+      setMedicineId('')
+      setMedicineSearch('')
+      setMessage('Order submitted. Each required prescription was attached to its medicine for separate pharmacy review.')
+    } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to create order.' : 'The order or one of its prescription uploads could not be completed.') }
+    finally { setSubmitting(false) }
+  }
+
+  return <section className="panel patient-order-create multi-medicine-order">
+    <div className="panel-heading new-order-heading"><div><p className="eyebrow">NEW ORDER</p><h1>Create a medicine order</h1><p className="muted">Complete the three steps below. Prescription files stay attached to their specific medicines.</p></div><span className="order-cart-count"><ShoppingCart size={16} aria-hidden="true" /> {items.length} selected</span></div>
+    <ol className="order-progress" aria-label="Order creation progress">
+      {[['Choose pharmacy', 'Select an approved pharmacy'], ['Add medicines', 'Search and attach prescriptions'], ['Delivery location', 'Pin where the order should arrive']].map(([title, description], index) => { const step = index + 1; const state = stepState(step); return <li className={state} aria-current={state === 'current' ? 'step' : undefined} key={title}><span className="order-progress-marker">{state === 'complete' ? <FileCheck2 size={17} aria-hidden="true" /> : step}</span><span><strong>{title}</strong><small>{description}</small></span></li> })}
+    </ol>
+    <form className="customer-order-form guided-order-form" onSubmit={submit}>
+      <section ref={mapSection} className={`order-flow-section map-flow-section ${stepState(1)}`}>
+        <div className="order-flow-heading"><span className="order-step-number">1</span><div><h2>{selectedPharmacy ? String(selectedPharmacy.business_name) : 'Choose a pharmacy'}</h2><p>{selectedPharmacy ? String(selectedPharmacy.address ?? 'Approved pharmacy selected') : 'Select a pharmacy marker. Delivery pinning becomes available after selection.'}</p></div>{selectedPharmacy && <span className="step-complete-label"><FileCheck2 size={16} aria-hidden="true" /> Selected</span>}</div>
+        <CustomerOrderMap pharmacies={pharmacies} selectedPharmacy={selectedPharmacy} deliveryPoint={deliveryPoint} onPharmacySelect={selectPharmacy} onDeliverySelect={(latitude, longitude) => setDeliveryPoint({ latitude, longitude })} />
+      </section>
+
+      <section className={`order-flow-section ${stepState(2)}`} aria-labelledby="medicine-step-title">
+        <div className="order-flow-heading"><span className="order-step-number">2</span><div><h2 id="medicine-step-title">Add medicines</h2><p>{selectedPharmacy ? 'Start typing and choose a matching medicine from the suggestions.' : 'Choose a pharmacy first to load its available catalog.'}</p></div>{items.length > 0 && <span className="step-complete-label"><FileCheck2 size={16} aria-hidden="true" /> {items.length} added</span>}</div>
+        {selectedPharmacy ? <div className="medicine-picker autocomplete-medicine-picker"><label className="medicine-autocomplete-field"><span>Medicine</span><span className="medicine-autocomplete-input"><Search size={18} aria-hidden="true" /><input list="available-medicine-options" aria-label="Search and select medicine" aria-autocomplete="list" value={medicineSearch} onChange={(event) => updateMedicineSearch(event.target.value)} placeholder="Start typing a medicine, Arabic name, or manufacturer" /></span><datalist id="available-medicine-options">{medicines.map((medicine) => <option value={medicineOptionLabel(medicine)} key={String(medicine.id)}>{String(medicine.name_ar ?? '')}{medicine.prescription_required ? ' · Prescription required' : ''}</option>)}</datalist>{medicineSearch && !medicineId && <small>Choose one of the matching suggestions to continue.</small>}</label><label>Quantity<input aria-label="Medicine quantity" type="number" min="1" max="100" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><button type="button" className="ghost-button add-medicine-button" disabled={!medicineId} onClick={addMedicine}><Plus size={17} aria-hidden="true" /> Add medicine</button></div> : <div className="order-step-empty"><span>1</span><p>Select a pharmacy on the map to unlock medicine search.</p></div>}
+        <div className="selected-medicine-list">{items.length === 0 ? <div className="state">No medicines selected yet.</div> : items.map((item, index) => <article className="selected-medicine-item" key={String(item.medicine.id)}><span className="selected-medicine-index">{index + 1}</span><div className="selected-medicine-copy"><button type="button" className="medicine-name-link" onClick={() => openMedicineDetail(Number(item.medicine.id))}>{String(item.medicine.name_en)}</button><span>{String(item.medicine.dosage ?? item.medicine.form ?? item.medicine.manufacturer ?? '')}</span>{item.medicine.prescription_required && <strong className="prescription-required-label">Prescription required</strong>}</div><label>Quantity<input aria-label={`Quantity for ${String(item.medicine.name_en)}`} type="number" min="1" max="100" value={item.quantity} onChange={(event) => setItems((current) => current.map((entry) => entry.medicine.id === item.medicine.id ? { ...entry, quantity: Math.max(1, Number(event.target.value) || 1) } : entry))} /></label>{item.medicine.prescription_required ? <label className="item-prescription-field">Prescription for this medicine<input aria-label={`Prescription for ${String(item.medicine.name_en)}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setItems((current) => current.map((entry) => entry.medicine.id === item.medicine.id ? { ...entry, prescription: event.target.files?.[0] ?? null } : entry))} required /></label> : <span className="no-prescription-label"><ShieldCheck size={15} aria-hidden="true" /> No prescription required</span>}<button type="button" className="remove-medicine-button" aria-label={`Remove ${String(item.medicine.name_en)}`} onClick={() => setItems((current) => current.filter((entry) => entry.medicine.id !== item.medicine.id))}><Trash2 size={17} aria-hidden="true" /></button></article>)}</div>
+      </section>
+
+      <section className={`order-flow-section ${stepState(3)}`} aria-labelledby="delivery-step-title">
+        <div className="order-flow-heading"><span className="order-step-number">3</span><div><h2 id="delivery-step-title">Confirm delivery location</h2><p>{deliveryPoint ? 'Your delivery point is ready. You can change it before submitting.' : selectedPharmacy ? 'Click the map above to place the delivery pin.' : 'Choose a pharmacy before pinning a delivery location.'}</p></div>{deliveryPoint && <span className="step-complete-label"><FileCheck2 size={16} aria-hidden="true" /> Pinned</span>}</div>
+        <div className={`delivery-point-summary ${deliveryPoint ? 'selected' : ''}`}><div><strong>{deliveryPoint ? 'Delivery location selected' : 'No delivery location yet'}</strong><small>{deliveryPoint ? `${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)}` : 'The exact coordinates will appear here.'}</small></div><button type="button" className="ghost-button" disabled={!selectedPharmacy} onClick={() => mapSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>{deliveryPoint ? 'Change on map' : 'Open map'}</button></div>
+        <div className="order-submit-bar"><div><strong>{items.length} {items.length === 1 ? 'medicine' : 'medicines'} in this order</strong><span>{missingPrescription ? 'Add every required prescription before submitting.' : deliveryPoint && items.length > 0 ? 'Ready to submit for pharmacy review.' : 'Complete all three steps to continue.'}</span></div><button className="primary-button" type="submit" disabled={submitting || !selectedPharmacy || items.length === 0 || !deliveryPoint || missingPrescription}>{submitting ? 'Creating order…' : 'Create order'}</button></div>
+      </section>
+      {message && <div className="form-message" role="status">{message}</div>}
+    </form>
+  </section>
+}
+
+function PatientOrderCreatePanelLegacy2({ locale }: { locale: string }) {
+  void locale
+  const [pharmacies, setPharmacies] = useState<Array<Record<string, unknown>>>([])
+  const [medicines, setMedicines] = useState<Array<Record<string, unknown>>>([])
+  const [selectedPharmacy, setSelectedPharmacy] = useState<Record<string, unknown> | null>(null)
+  const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [medicineSearch, setMedicineSearch] = useState('')
+  const [medicineId, setMedicineId] = useState('')
+  const [quantity, setQuantity] = useState('1')
+  const [items, setItems] = useState<Array<{ medicine: Record<string, any>; quantity: number; prescription: File | null }>>([])
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  useEffect(() => { api.get('/partners', { params: { type: 'pharmacy', per_page: 100 } }).then((response) => setPharmacies(response.data.data ?? [])).catch(() => setMessage('Unable to load approved pharmacies.')) }, [])
+  const selectPharmacy = (pharmacy: Record<string, unknown>) => { setSelectedPharmacy(pharmacy); setItems([]); setMedicineId(''); setMedicines([]); api.get('/medicines', { params: { available_only: true, partner_id: Number(pharmacy.id), per_page: 100 } }).then((response) => setMedicines(response.data.data ?? [])).catch(() => setMessage('Unable to load medicines for this pharmacy.')) }
+  const filteredMedicines = medicines.filter((medicine) => `${String(medicine.name_en ?? '')} ${String(medicine.name_ar ?? '')} ${String(medicine.manufacturer ?? '')}`.toLowerCase().includes(medicineSearch.toLowerCase()))
+  const addMedicine = () => { const medicine = medicines.find((entry) => String(entry.id) === medicineId); const count = Math.max(1, Math.min(100, Number(quantity) || 1)); if (!medicine) return; setItems((current) => { const existing = current.find((item) => item.medicine.id === medicine.id); return existing ? current.map((item) => item.medicine.id === medicine.id ? { ...item, quantity: Math.min(100, item.quantity + count) } : item) : [...current, { medicine, quantity: count, prescription: null }] }); setMedicineId(''); setQuantity('1') }
+  const missingPrescription = items.some((item) => Boolean(item.medicine.prescription_required) && !item.prescription)
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedPharmacy || !deliveryPoint || items.length === 0) { setMessage('Select a pharmacy, add at least one medicine, and pin the delivery location.'); return }
+    if (missingPrescription) { setMessage('Upload a separate prescription for every medicine marked as prescription required.'); return }
+    setSubmitting(true)
+    setMessage('')
+    try {
+      const response = await api.post('/orders', { pharmacy_id: Number(selectedPharmacy.id), delivery_address_snapshot: `Pinned map location (${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)})`, items: items.map((item) => ({ medicine_id: Number(item.medicine.id), quantity: item.quantity })) }, mutationConfig('patient-order', uniqueMutationId('patient-order'), 'create'))
+      const order = response.data.order ?? response.data
+      const createdItems = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : []
+      for (const selected of items.filter((item) => item.prescription)) {
+        const created = createdItems.find((item) => Number(item.medicine_id) === Number(selected.medicine.id))
+        if (!created) throw new Error('Created order item could not be matched to its prescription.')
+        const form = new FormData()
+        form.append('prescription', selected.prescription as File)
+        await api.post(`/orders/${String(order.id)}/items/${String(created.id)}/prescription`, form, { headers: mutationConfig('item-prescription', created.id as number, 'upload').headers })
+      }
+      setItems([])
+      setMedicineId('')
+      setMessage('Order submitted. Each required prescription was attached to its medicine for separate pharmacy review.')
+    } catch (error) { setMessage(axios.isAxiosError(error) ? error.response?.data?.message ?? 'Unable to create order.' : 'The order or one of its prescription uploads could not be completed.') }
+    finally { setSubmitting(false) }
+  }
+  return <section className="panel patient-order-create multi-medicine-order"><div className="panel-heading"><div><p className="eyebrow">NEW ORDER · 3 STEPS</p><h2>Build a multi-medicine order</h2><p className="muted">Choose one pharmacy, add all required medicines, attach item-specific prescriptions, then pin delivery.</p></div><span className="order-cart-count"><ShoppingCart size={16} /> {items.length} selected</span></div><CustomerOrderMap pharmacies={pharmacies} selectedPharmacy={selectedPharmacy} deliveryPoint={deliveryPoint} onPharmacySelect={selectPharmacy} onDeliverySelect={(latitude, longitude) => setDeliveryPoint({ latitude, longitude })} /><form className="customer-order-form" onSubmit={submit}><div className="order-step-card"><span className="order-step-number">1</span><div><strong>{selectedPharmacy ? String(selectedPharmacy.business_name) : 'Select a pharmacy on the map'}</strong><small>{selectedPharmacy ? 'Now add one or more medicines from this pharmacy.' : 'Click a pharmacy marker to load its available catalog.'}</small></div></div>{selectedPharmacy && <div className="medicine-picker"><label>Search medicines<input value={medicineSearch} onChange={(event) => setMedicineSearch(event.target.value)} placeholder="Name, Arabic name, or manufacturer" /></label><label>Medicine<select value={medicineId} onChange={(event) => setMedicineId(event.target.value)}><option value="">Choose a medicine</option>{filteredMedicines.map((medicine) => <option key={String(medicine.id)} value={String(medicine.id)}>{String(medicine.name_en)}{medicine.prescription_required ? ' · Prescription' : ''}</option>)}</select></label><label>Quantity<input type="number" min="1" max="100" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><button type="button" className="ghost-button add-medicine-button" disabled={!medicineId} onClick={addMedicine}>Add medicine</button></div>}<div className="selected-medicine-list">{items.length === 0 ? <div className="state">No medicines selected yet.</div> : items.map((item, index) => <article className="selected-medicine-item" key={String(item.medicine.id)}><span className="selected-medicine-index">{index + 1}</span><div className="selected-medicine-copy"><button type="button" className="medicine-name-link" onClick={() => openMedicineDetail(Number(item.medicine.id))}>{String(item.medicine.name_en)}</button><span>{String(item.medicine.dosage ?? item.medicine.form ?? item.medicine.manufacturer ?? '')}</span>{item.medicine.prescription_required && <strong className="prescription-required-label">Prescription required</strong>}</div><label>Quantity<input aria-label={`Quantity for ${String(item.medicine.name_en)}`} type="number" min="1" max="100" value={item.quantity} onChange={(event) => setItems((current) => current.map((entry) => entry.medicine.id === item.medicine.id ? { ...entry, quantity: Math.max(1, Number(event.target.value) || 1) } : entry))} /></label>{item.medicine.prescription_required ? <label className="item-prescription-field">Prescription for this medicine<input aria-label={`Prescription for ${String(item.medicine.name_en)}`} type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setItems((current) => current.map((entry) => entry.medicine.id === item.medicine.id ? { ...entry, prescription: event.target.files?.[0] ?? null } : entry))} required /></label> : <span className="no-prescription-label"><ShieldCheck size={15} /> No prescription</span>}<button type="button" className="remove-medicine-button" aria-label={`Remove ${String(item.medicine.name_en)}`} onClick={() => setItems((current) => current.filter((entry) => entry.medicine.id !== item.medicine.id))}><Trash2 size={17} /></button></article>)}</div><div className={`delivery-point-summary ${deliveryPoint ? 'selected' : ''}`}><span className="order-step-number">3</span><div><strong>{deliveryPoint ? 'Delivery location selected' : 'Pin your delivery location'}</strong><small>{deliveryPoint ? `${deliveryPoint.latitude.toFixed(6)}, ${deliveryPoint.longitude.toFixed(6)}` : 'Click the map where you want the driver to deliver.'}</small></div></div><button className="primary-button" type="submit" disabled={submitting || !selectedPharmacy || items.length === 0 || !deliveryPoint || missingPrescription}>{submitting ? 'Creating order...' : `Create order with ${items.length} ${items.length === 1 ? 'medicine' : 'medicines'}`}</button>{message && <div className="form-message" role="status">{message}</div>}</form></section>
+}
+
+void PatientOrderCreatePanelLegacy2
+void PatientOrderCreatePanelLegacy
+function PatientOrderCreatePanelLegacy({ locale: _locale }: { locale: string }) {
   const [pharmacies, setPharmacies] = useState<Array<Record<string, unknown>>>([])
   const [medicines, setMedicines] = useState<Array<Record<string, unknown>>>([])
   const [selectedPharmacy, setSelectedPharmacy] = useState<Record<string, unknown> | null>(null)
@@ -902,6 +1524,7 @@ export function OperationsPage({ section, role, locale }: { section: string; rol
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
   const [lastPage, setLastPage] = useState(1)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
@@ -911,11 +1534,12 @@ export function OperationsPage({ section, role, locale }: { section: string; rol
   const endpoint = operationsEndpoint(section, role)
   const runMutation = async (key: string, task: () => Promise<void>) => { if (busyMutationKeys.current.has(key)) return; busyMutationKeys.current.add(key); try { await task() } catch (error) { const message = axios.isAxiosError(error) ? error.response?.data?.message ?? 'The operation could not be completed. You can retry the same action safely.' : 'The operation could not be completed. You can retry the same action safely.'; announceAccessibilityMessage(message); window.alert(message) } finally { busyMutationKeys.current.delete(key) } }
   useEffect(() => { setPage(1); setStatusFilter(''); setSortBy('created_at'); setSortDirection('desc') }, [section, endpoint, search])
-  useEffect(() => { let cancelled = false; setLoading(true); const params = section === 'verification' ? { search, status: 'pending', per_page: 8, page } : section === 'documents' ? { status: 'under_review', per_page: 8, page } : { search, ...(section === 'orders' && statusFilter ? { status: statusFilter } : {}), ...(section === 'orders' ? { sort_by: sortBy, sort_direction: sortDirection } : {}), per_page: 8, page }; api.get(endpoint, { params }).then((response) => { if (cancelled) return; const data = response.data.data ?? []; setLastPage(Number(response.data.meta?.last_page ?? 1)); setRows(data.map((item: Record<string, unknown>) => ({ id: Number(item.id ?? 0), primary: String(item.business_name ?? item.name ?? item.name_en ?? item.public_id ?? `Record ${item.id}`), secondary: String(item.email ?? item.document_type ?? item.name_ar ?? item.manufacturer ?? item.delivery_address_snapshot ?? item.status ?? 'Operational record'), status: String(item.status ?? item.approval_status ?? 'Active'), raw: item }))) }).catch(() => { if (!cancelled) { setRows([]); setLastPage(1) } }).finally(() => { if (!cancelled) setLoading(false) }); return () => { cancelled = true } }, [endpoint, section, search, page, statusFilter, sortBy, sortDirection])
+  useEffect(() => { let cancelled = false; setLoading(true); const requestedPageSize = section === 'orders' ? perPage : 8; const params = section === 'verification' ? { search, status: 'pending', per_page: requestedPageSize, page } : section === 'documents' ? { status: 'under_review', per_page: requestedPageSize, page } : { search, ...(section === 'orders' && statusFilter ? { status: statusFilter } : {}), ...(section === 'orders' ? { sort_by: sortBy, sort_direction: sortDirection } : {}), per_page: requestedPageSize, page }; api.get(endpoint, { params }).then((response) => { if (cancelled) return; const data = response.data.data ?? []; setLastPage(Number(response.data.last_page ?? response.data.meta?.last_page ?? 1)); setRows(data.map((item: Record<string, unknown>) => ({ id: Number(item.id ?? 0), primary: String(item.business_name ?? item.name ?? item.name_en ?? item.public_id ?? `Record ${item.id}`), secondary: String(item.email ?? item.document_type ?? item.name_ar ?? item.manufacturer ?? item.delivery_address_snapshot ?? item.status ?? 'Operational record'), status: String(item.status ?? item.approval_status ?? 'Active'), raw: item }))) }).catch(() => { if (!cancelled) { setRows([]); setLastPage(1) } }).finally(() => { if (!cancelled) setLoading(false) }); return () => { cancelled = true } }, [endpoint, section, search, page, perPage, statusFilter, sortBy, sortDirection])
   useEffect(() => { if (section !== 'complaints' || role !== 'admin') { setComplaintReport(null); return } api.get('/admin/reports/complaints').then((response) => setComplaintReport(response.data)).catch(() => setComplaintReport(null)) }, [section, role, rows.length])
   const decidePartner = async (id: number, decision: 'approve' | 'reject') => runMutation(`partner:${id}:${decision}`, async () => { await api.post(`/admin/partners/${id}/decision`, { decision }, mutationConfig('partner-decision', id, decision)); setRows((current) => current.filter((row) => row.id !== id)) })
   const decideOrder = async (id: number, decision: 'accept' | 'reject') => runMutation(`order:${id}:${decision}`, async () => { await api.post(`/partner/orders/${id}/decision`, { decision }, mutationConfig('order-decision', id, decision)); setRows((current) => current.filter((row) => row.id !== id)) })
   const decidePrescription = async (id: number, decision: 'approve' | 'reject') => runMutation(`prescription:${id}:${decision}`, async () => { await api.post(`/pharmacy/prescriptions/${id}/review`, { decision }, mutationConfig('prescription-review', id, decision)); setRows((current) => current.map((row) => row.id === id ? { ...row, status: decision === 'approve' ? 'pending_pharmacy_review' : 'cancelled' } : row)) })
+  void decidePrescription
   const decideProcurement = async (id: number, decision: 'accept' | 'reject') => runMutation(`procurement:${id}:${decision}`, async () => { await api.post(`/procurement/${id}/decision`, { decision }, mutationConfig('procurement-decision', id, decision)); setRows((current) => current.filter((row) => row.id !== id)) })
   const decidePayment = async (id: number, decision: 'approve' | 'reject') => runMutation(`payment:${id}:${decision}`, async () => { await api.post(`/admin/subscriptions/${id}/decision`, { decision }, mutationConfig('subscription-decision', id, decision)); setRows((current) => current.filter((row) => row.id !== id)) })
   const updateComplaint = async (id: number, status: 'in_review' | 'resolved') => runMutation(`complaint:${id}:${status}`, async () => { await api.patch(`/complaints/${id}`, { status }, mutationConfig('complaint-status', id, status)); setRows((current) => current.map((row) => row.id === id ? { ...row, status } : row)) })
@@ -928,6 +1552,7 @@ export function OperationsPage({ section, role, locale }: { section: string; rol
   const toggleSort = (key: string) => { if (section !== 'orders') return; if (sortBy === key) setSortDirection((current) => current === 'asc' ? 'desc' : 'asc'); else { setSortBy(key); setSortDirection('asc') }; setPage(1) }
   if (detail) return detail._kind === 'complaint' ? <ComplaintDetailPanel detail={detail} onClose={() => setDetail(null)} locale={locale} /> : detail._kind === 'procurement' ? <ProcurementDetailPanel detail={detail} onClose={() => setDetail(null)} locale={locale} /> : detail._kind === 'delivery' ? <DeliveryDetailPanel detail={detail} onClose={() => setDetail(null)} locale={locale} /> : <OrderDetailPanel detail={detail} onClose={() => setDetail(null)} locale={locale} />
   if (section === 'ratings' && role === 'admin') return <RatingQueue locale={locale} />
+  const orderListAction = (row: Row) => <button className="ghost-button" aria-label={`View order ${row.primary}`} title={`View order ${row.primary}`} onClick={() => void openDetail(row.id)}><Eye size={22} strokeWidth={2.5} /></button>
   const action = (row: Row) => section === 'verification' ? <div className="row-actions"><button className="approve-button" aria-label={tr('approve', locale)} title={tr('approve', locale)} onClick={() => decidePartner(row.id, 'approve')}><FileCheck2 size={22} strokeWidth={2.5} /></button><button className="reject-button" aria-label={tr('reject', locale)} title={tr('reject', locale)} onClick={() => decidePartner(row.id, 'reject')}><FileX2 size={22} strokeWidth={2.5} /></button></div> : section === 'documents' && role === 'admin' && row.status.includes('review') ? <div className="row-actions"><button className="ghost-button" aria-label={tr('download', locale)} title={tr('download', locale)} onClick={() => void downloadPrivate(`/verification-documents/${row.id}/download`, `medline-document-${row.id}`)}><Eye size={22} strokeWidth={2.5} /></button><button className="approve-button" aria-label={tr('approve', locale)} title={tr('approve', locale)} onClick={() => decideDocument(row.id, 'approve')}><FileCheck2 size={22} strokeWidth={2.5} /></button><button className="reject-button" aria-label={tr('reject', locale)} title={tr('reject', locale)} onClick={() => decideDocument(row.id, 'reject')}><FileX2 size={22} strokeWidth={2.5} /></button></div> : section === 'users' && role === 'admin' ? <div className="row-actions"><button className={row.status === 'suspended' ? 'approve-button' : 'reject-button'} aria-label={row.status === 'suspended' ? tr('reactivate', locale) : tr('suspend', locale)} title={row.status === 'suspended' ? tr('reactivate', locale) : tr('suspend', locale)} onClick={() => updateUserStatus(row.id, row.status === 'suspended' ? 'active' : 'suspended')}>{row.status === 'suspended' ? <FileCheck2 size={22} strokeWidth={2.5} /> : <FileX2 size={22} strokeWidth={2.5} />}</button></div> : section === 'deliveries' && role === 'admin' && row.status === 'failed' ? <div className="row-actions"><button className="approve-button" aria-label={tr('reassign', locale)} title={tr('reassign', locale)} onClick={() => reassignDelivery(row.id)}><FileCheck2 size={22} strokeWidth={2.5} /></button></div> : section === 'orders' && role === 'pharmacy' && row.status.includes('pending') ? <div className="row-actions"><button className="approve-button" aria-label={tr('accept', locale)} title={tr('accept', locale)} onClick={() => decideOrder(row.id, 'accept')}><FileCheck2 size={22} strokeWidth={2.5} /></button><button className="reject-button" aria-label={tr('reject', locale)} title={tr('reject', locale)} onClick={() => decideOrder(row.id, 'reject')}><FileX2 size={22} strokeWidth={2.5} /></button></div> : section === 'procurement' && role === 'warehouse' && row.status.includes('pending') ? <div className="row-actions"><button className="approve-button" aria-label={tr('accept', locale)} title={tr('accept', locale)} onClick={() => decideProcurement(row.id, 'accept')}><FileCheck2 size={22} strokeWidth={2.5} /></button><button className="reject-button" aria-label={tr('reject', locale)} title={tr('reject', locale)} onClick={() => decideProcurement(row.id, 'reject')}><FileX2 size={22} strokeWidth={2.5} /></button></div> : section === 'subscriptions' && row.status.includes('review') ? <div className="row-actions"><button className="ghost-button" aria-label={tr('receipt', locale)} title={tr('receipt', locale)} onClick={() => void downloadPrivate(`/admin/payment-proofs/${String(row.raw?.payment_proof_id ?? row.id)}/download`, `medline-payment-proof-${row.id}`)}><Eye size={22} strokeWidth={2.5} /></button><button className="approve-button" aria-label={tr('approve', locale)} title={tr('approve', locale)} onClick={() => decidePayment(row.id, 'approve')}><FileCheck2 size={22} strokeWidth={2.5} /></button><button className="reject-button" aria-label={tr('reject', locale)} title={tr('reject', locale)} onClick={() => decidePayment(row.id, 'reject')}><FileX2 size={22} strokeWidth={2.5} /></button></div> : section === 'complaints' ? <div className="row-actions"><button className="ghost-button" aria-label={tr('view', locale)} title={tr('view', locale)} onClick={() => void openDetail(row.id)}><Eye size={22} strokeWidth={2.5} /></button>{(row.status === 'open' || row.status === 'in_review') && <button className="approve-button" aria-label={row.status === 'open' ? tr('review', locale) : tr('resolve', locale)} title={row.status === 'open' ? tr('review', locale) : tr('resolve', locale)} onClick={() => updateComplaint(row.id, row.status === 'open' ? 'in_review' : 'resolved')}><FileCheck2 size={22} strokeWidth={2.5} /></button>}</div> : section === 'audit' ? <button className="ghost-button" aria-label={tr('exportCsv', locale)} title={tr('exportCsv', locale)} onClick={() => void exportAudit()}><Eye size={22} strokeWidth={2.5} /></button> : <button className="ghost-button" aria-label={tr('view', locale)} title={tr('view', locale)} onClick={() => void openDetail(row.id)}><Eye size={22} strokeWidth={2.5} /></button>
   const richTable = section === 'procurement' || section === 'inventory' || section === 'orders'
   const richHeaders = section === 'procurement' ? ['Procurement', 'Pharmacy', 'Warehouse', 'Value', 'Status', 'Created', 'Action'] : section === 'inventory' ? ['Medicine', 'Owner', 'Available', 'Reserved', 'Unit price', 'Stock health', 'Action'] : ['Order', 'Customer', 'Pharmacy', 'Driver', 'Medicines', 'Destination', 'Total', 'Status', 'Created', 'Action']
@@ -936,6 +1561,109 @@ export function OperationsPage({ section, role, locale }: { section: string; rol
   const richCells = (row: Row) => section === 'procurement' ? <><strong>{row.primary}</strong><span>{String(row.raw?.pharmacy_name ?? 'Pharmacy not recorded')}</span><span>{String(row.raw?.warehouse_name ?? 'Warehouse not recorded')}</span><span className="money-cell">SYP {Number(row.raw?.total ?? 0).toLocaleString()}</span><span className="status-pill">{row.status}</span><span>{formatMedlineDate(row.raw?.created_at)}</span>{action(row)}</> : section === 'inventory' ? <><strong>{row.primary}</strong><span>{String(row.raw?.owner_name ?? row.raw?.owner_type ?? 'Owner not recorded')}</span><span>{String(Number(row.raw?.quantity ?? 0) - Number(row.raw?.reserved_quantity ?? 0))}</span><span>{String(row.raw?.reserved_quantity ?? 0)}</span><span className="money-cell">SYP {Number(row.raw?.unit_price ?? 0).toLocaleString()}</span><span className={`stock-health ${Number(row.raw?.quantity ?? 0) - Number(row.raw?.reserved_quantity ?? 0) <= Number(row.raw?.low_stock_threshold ?? 0) ? 'low' : 'healthy'}`}>{Number(row.raw?.quantity ?? 0) - Number(row.raw?.reserved_quantity ?? 0) <= Number(row.raw?.low_stock_threshold ?? 0) ? 'Low stock' : 'Healthy'}</span>{action(row)}</> : <><strong>{row.primary}</strong><span>{String(row.raw?.customer_name ?? 'Customer not recorded')}</span><span>{String(row.raw?.pharmacy_name ?? 'Pharmacy not recorded')}</span><span>{String(row.raw?.driver_name ?? 'Unassigned')}</span><span>{String(row.raw?.medicine_names ?? 'No medicines listed')}</span><span>{String(row.raw?.delivery_address_snapshot ?? 'Destination not recorded')}</span><span className="money-cell">SYP {Number(row.raw?.total ?? 0).toLocaleString()}</span><span className={`order-status status-${row.status.replaceAll('_', '-')}`}><i />{row.status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</span><span>{formatMedlineDate(row.raw?.created_at)}</span>{action(row)}</>
   const reportTotals = (complaintReport?.totals ?? {}) as Record<string, unknown>
   const canOpenDetail = ['orders', 'deliveries', 'complaints', 'procurement'].includes(section)
+  const orderColumns = [
+    { label: 'Order', key: 'public_id', className: 'order' },
+    { label: 'Customer', key: 'customer_name', className: 'customer' },
+    { label: 'Pharmacy', key: 'pharmacy_name', className: 'pharmacy' },
+    { label: 'Driver', key: 'driver_name', className: 'driver' },
+    { label: 'Medicines', key: 'medicine_names', className: 'medicines' },
+    { label: 'Destination', key: 'delivery_address_snapshot', className: 'destination' },
+    { label: 'Total', key: 'total', className: 'total' },
+    { label: 'Status', key: 'status', className: 'status' },
+    { label: 'Created', key: 'created_at', className: 'created' },
+    { label: 'Action', key: '', className: 'action' },
+  ] as const
+  const orderStatusLabel = (status: string) => status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+  const orderDateParts = (value: unknown) => {
+    const formatted = formatMedlineDate(value, locale)
+    const separator = formatted.lastIndexOf(', ')
+    return separator > -1 ? [formatted.slice(0, separator), formatted.slice(separator + 2)] : [formatted, '']
+  }
+
+  if (section === 'orders') return (
+    <section className="content orders-content">
+      <section className="panel table-panel rich-operations-panel orders-table-panel">
+        <div className="panel-heading orders-panel-heading">
+          <div>
+            <div className="orders-heading-row">
+              <h1>{tr('orders', locale)} {tr('overview', locale)}</h1>
+              <span className="orders-result-count" aria-live="polite">{loading ? 'Updating' : `${displayedRows.length} ${displayedRows.length === 1 ? 'order' : 'orders'}`}</span>
+            </div>
+            <p className="muted">Search, review and manage every order from one place.</p>
+          </div>
+          {role === 'patient' && <button type="button" className="primary-button create-order-button" onClick={() => { window.history.pushState({}, '', '/orders/new'); window.dispatchEvent(new PopStateEvent('popstate')) }}><Plus size={17} aria-hidden="true" /> Create new order</button>}
+        </div>
+
+        <div className="table-controls orders-toolbar" role="search" aria-label="Order filters">
+          <label className="orders-search-control">
+            <span>Search orders</span>
+            <span className="search-box">
+              <Search size={19} aria-hidden="true" />
+              <input aria-label={`${tr('search', locale)} ${tr('orders', locale)}`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Order, customer, medicine or destination" />
+            </span>
+          </label>
+          <label className="orders-status-filter">
+            <span>Status</span>
+            <select aria-label="Filter orders by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}>
+              <option value="">All statuses</option>
+              <option value="pending_pharmacy_review">Pending pharmacy review</option>
+              <option value="prescription_review">Prescription review</option>
+              <option value="partial_approval_required">Awaiting patient approval</option>
+              <option value="partially_accepted">Partial order approved</option>
+              <option value="partial_offer_rejected">Partial offer declined</option>
+              <option value="accepted">Accepted</option>
+              <option value="in_transit">In transit</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="orders-table-region" role="region" aria-label="Scrollable orders table" aria-busy={loading} tabIndex={0}>
+          <table className="orders-data-table">
+            <caption className="sr-only">{tr('orders', locale)} {tr('overview', locale)}</caption>
+            <colgroup>{orderColumns.map((column) => <col className={`col-${column.className}`} key={column.label} />)}</colgroup>
+            <thead>
+              <tr>
+                {orderColumns.map((column) => (
+                  <th className={`col-${column.className}`} scope="col" key={column.label} aria-sort={column.key ? (sortBy === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}>
+                    {column.key ? <button type="button" className={`orders-sort-button ${sortBy === column.key ? 'active' : ''}`} onClick={() => toggleSort(column.key)} title={`Sort by ${column.label}`}><span>{column.label}</span>{sortBy === column.key ? (sortDirection === 'asc' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />) : <ArrowUpDown aria-hidden="true" />}</button> : column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr className="orders-state-row"><td colSpan={orderColumns.length}><span className="state" role="status" aria-live="polite">{tr('loadingRecords', locale)}</span></td></tr> : displayedRows.length === 0 ? <tr className="orders-state-row"><td colSpan={orderColumns.length}><span className="state" role="status">{tr('noRecordsYet', locale)}</span></td></tr> : displayedRows.map((row) => {
+                const [createdDate, createdTime] = orderDateParts(row.raw?.created_at)
+                const statusLabel = orderStatusLabel(row.status)
+                return <tr className="orders-data-row" key={row.id} tabIndex={0} aria-label={`Open order ${row.primary}`} onClick={(event) => { if ((event.target as HTMLElement).closest('button, a, input, select, textarea')) return; void openDetail(row.id) }} onKeyDown={(event) => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); void openDetail(row.id) }}>
+                  <th className="col-order" scope="row" data-label="Order"><button className="order-id-button" type="button" onClick={() => void openDetail(row.id)} title={`Open order ${row.primary}`}>{row.primary}</button></th>
+                  <td className="col-customer" data-label="Customer"><span className="orders-cell-primary">{String(row.raw?.customer_name ?? 'Customer not recorded')}</span></td>
+                  <td className="col-pharmacy" data-label="Pharmacy">{String(row.raw?.pharmacy_name ?? 'Pharmacy not recorded')}</td>
+                  <td className="col-driver" data-label="Driver">{String(row.raw?.driver_name ?? 'Unassigned')}</td>
+                  <td className="col-medicines" data-label="Medicines">{String(row.raw?.medicine_names ?? 'No medicines listed')}</td>
+                  <td className="col-destination" data-label="Destination">{String(row.raw?.delivery_address_snapshot ?? 'Destination not recorded')}</td>
+                  <td className="col-total" data-label="Total"><span className="orders-money"><small>SYP</small> {Number(row.raw?.total ?? 0).toLocaleString(locale === 'ar' ? 'ar' : 'en-GB')}</span></td>
+                  <td className="col-status" data-label="Status"><span className={`order-status status-${row.status.replaceAll('_', '-')}`}><i aria-hidden="true" />{statusLabel}</span></td>
+                  <td className="col-created" data-label="Created"><time dateTime={String(row.raw?.created_at ?? '')}><span>{createdDate}</span>{createdTime && <small>{createdTime}</small>}</time></td>
+                  <td className="col-action" data-label="Action"><div className="orders-action-cell">{orderListAction(row)}</div></td>
+                </tr>
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="orders-table-footer">
+          <label className="orders-page-size">
+            <span>Rows per page</span>
+            <select aria-label="Rows per page" value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1) }}>
+              {[5, 10, 25, 50].map((size) => <option value={size} key={size}>{size}</option>)}
+            </select>
+          </label>
+          <TablePagination page={page} lastPage={lastPage} onPageChange={setPage} />
+        </div>
+      </section>
+    </section>
+  )
   return <section className="content">{section === 'orders' && role === 'patient' && <PatientOrderCreatePanel locale={locale} />}<div className="welcome-row"><div><p className="eyebrow">MEDLINE OPERATIONS</p><h1>{tr(section, locale)}</h1><p className="muted">{tr('workflowGuidance', locale)}</p></div>{section === 'inventory' && role !== 'admin' && <form className="inline-form" onSubmit={updateInventory}><input name="medicine_id" type="number" placeholder={tr('medicineId', locale)} required /><input name="quantity" type="number" placeholder={tr('quantity', locale)} min="0" required /><input name="unit_price" type="number" placeholder={tr('unitPrice', locale)} min="0" step="0.01" /><input name="low_stock_threshold" type="number" placeholder={tr('lowStock', locale)} min="0" defaultValue="5" /><button className="primary-button" type="submit"><Package size={17} /> {tr('saveStock', locale)}</button></form>}</div>{section === 'complaints' && role === 'admin' && complaintReport && <section className="metric-grid"><Metric label="Open complaints" value={String(reportTotals.open ?? 0)} change="Live" icon={<MessageSquare />} tone="orange" /><Metric label="In review" value={String(reportTotals.in_review ?? 0)} change="Live" icon={<History />} tone="violet" /><Metric label="Resolved complaints" value={String(reportTotals.resolved ?? 0)} change="Live" icon={<ShieldCheck />} tone="green" /></section>}<section className={`panel table-panel ${richTable ? 'rich-operations-panel' : ''}`}><div className="panel-heading"><div><p className="eyebrow">{tr(['orders', 'deliveries', 'verification', 'procurement'].includes(section) ? 'queue' : 'directory', locale)}</p><h2>{tr(section, locale)} {tr('overview', locale)}</h2></div><span className="live-status" role="status"><i aria-hidden="true" /> {tr('liveData', locale)}</span></div><div className="table-controls"><div className="search-box"><Search size={19} aria-hidden="true" /><input aria-label={tr('search', locale) + ' ' + tr(section, locale)} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('search', locale) + ' ' + tr(section, locale) + '...'} /></div>{section === 'orders' && <label className="status-filter-label"><span>Filter status</span><select aria-label="Filter orders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option><option value="pending_pharmacy_review">Pending pharmacy review</option><option value="prescription_review">Prescription review</option><option value="accepted">Accepted</option><option value="in_transit">In transit</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>}</div><div className="operations-table" aria-busy={loading}><div className="table-row table-head">{richTable ? section === 'orders' ? orderHeaders.map(([header, key]) => key ? <button type="button" className={`sortable-header ${sortBy === key ? 'active' : ''}`} onClick={() => toggleSort(key)} key={header} title={`Sort by ${header}`}>{header}{sortBy === key ? <span aria-hidden="true">{sortDirection === 'asc' ? ' ?' : ' ?'}</span> : null}</button> : <span key={header}>{header}</span>) : richHeaders.map((header) => <span key={header}>{header}</span>) : <><span>{tr('record', locale)}</span><span>{tr('details', locale)}</span><span>{tr('status', locale)}</span><span>{tr('action', locale)}</span></>}</div>{loading ? <div className="state" role="status" aria-live="polite">{tr('loadingRecords', locale)}</div> : rows.length === 0 ? <div className="state" role="status">{tr('noRecordsYet', locale)}</div> : displayedRows.map((row) => <div className={`table-row ${richTable ? 'rich-table-row' : ''} ${canOpenDetail ? 'clickable-table-row' : ''}`} key={row.id} onClick={() => { if (canOpenDetail) void openDetail(row.id) }} onKeyDown={(event) => { if (canOpenDetail && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); void openDetail(row.id) } }} tabIndex={canOpenDetail ? 0 : undefined}>{richTable ? richCells(row) : <><strong>{row.primary}</strong><span>{row.secondary}</span><span className="status-pill">{row.status}</span>{action(row)}</>}</div>)}</div><TablePagination page={page} lastPage={lastPage} onPageChange={setPage} /></section></section>
 }
 

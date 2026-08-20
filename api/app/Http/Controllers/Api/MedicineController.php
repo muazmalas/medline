@@ -13,9 +13,34 @@ use App\Support\AuditService;
 use App\Support\DatabaseTransaction;
 use Illuminate\Support\Facades\Validator;
 use App\Contracts\FileScanner;
+use Illuminate\Support\Facades\URL;
 
 class MedicineController extends Controller
 {
+    public function show(Request $request, Medicine $medicine): JsonResponse
+    {
+        abort_unless($medicine->is_active || $request->user()?->role === 'admin', 404);
+        $medicine->category = $medicine->category_id
+            ? DB::table('medicine_categories')->where('id', $medicine->category_id)->first(['id', 'name_en', 'name_ar', 'slug'])
+            : null;
+        $medicine->image_url = $medicine->image_path
+            ? (str_starts_with($medicine->image_path, 'public/')
+                ? URL::to(Storage::url($medicine->image_path))
+                : Storage::disk('public')->url($medicine->image_path))
+            : null;
+        $medicine->available_at = DB::table('inventories')
+            ->join('partners', function ($join) { $join->on('partners.id', '=', 'inventories.owner_id')->where('inventories.owner_type', 'pharmacy'); })
+            ->where('inventories.medicine_id', $medicine->id)
+            ->whereColumn('inventories.quantity', '>', 'inventories.reserved_quantity')
+            ->where('partners.approval_status', 'approved')
+            ->where('partners.subscription_status', 'active')
+            ->select('partners.id', 'partners.business_name', 'partners.address', DB::raw('(inventories.quantity - inventories.reserved_quantity) as available_quantity'), 'inventories.unit_price')
+            ->orderBy('partners.business_name')
+            ->get();
+
+        return response()->json(['medicine' => $medicine]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $search = trim($request->string('search')->toString());
@@ -96,10 +121,10 @@ class MedicineController extends Controller
         $data = $this->validated($request);
         $storedPath = null;
         try {
-            if ($request->hasFile('image')) { $scanner->scan($request->file('image')); $storedPath = $request->file('image')->store('public/medicines'); $data['image_path'] = $storedPath; }
+            if ($request->hasFile('image')) { $scanner->scan($request->file('image')); $storedPath = $request->file('image')->store('medicines', 'public'); $data['image_path'] = $storedPath; }
             $medicine = Medicine::create($data);
         } catch (\Throwable $exception) {
-            if ($storedPath) Storage::delete($storedPath);
+            if ($storedPath) Storage::disk('public')->delete($storedPath);
             throw $exception;
         }
         AuditService::record($request, 'medicine.created', Medicine::class, $medicine->id, ['code' => $medicine->code]);
@@ -115,15 +140,17 @@ class MedicineController extends Controller
         try {
             if ($request->hasFile('image')) {
                 $scanner->scan($request->file('image'));
-                $storedPath = $request->file('image')->store('public/medicines');
+                $storedPath = $request->file('image')->store('medicines', 'public');
                 $data['image_path'] = $storedPath;
             }
             $medicine->update($data);
         } catch (\Throwable $exception) {
-            if ($storedPath) Storage::delete($storedPath);
+            if ($storedPath) Storage::disk('public')->delete($storedPath);
             throw $exception;
         }
-        if ($storedPath && $oldPath && $oldPath !== $storedPath) Storage::delete($oldPath);
+        if ($storedPath && $oldPath && $oldPath !== $storedPath) {
+            str_starts_with($oldPath, 'public/') ? Storage::delete($oldPath) : Storage::disk('public')->delete($oldPath);
+        }
         AuditService::record($request, 'medicine.updated', Medicine::class, $medicine->id, ['is_active' => $medicine->is_active]);
         return response()->json(['message' => 'Medicine updated.', 'medicine' => $medicine->fresh()]);
     }
@@ -182,9 +209,20 @@ class MedicineController extends Controller
             'name_en' => ['required', 'string', 'max:180'],
             'name_ar' => ['required', 'string', 'max:180'],
             'manufacturer' => ['nullable', 'string', 'max:180'],
+            'active_ingredient' => ['nullable', 'string', 'max:255'],
             'form' => ['nullable', 'string', 'max:80'],
             'dosage' => ['nullable', 'string', 'max:80'],
+            'pack_size' => ['nullable', 'string', 'max:100'],
+            'administration_route' => ['nullable', 'string', 'max:80'],
             'code' => ['nullable', 'string', 'max:100', 'unique:medicines,code,' . ($medicineId ?? 'NULL') . ',id'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'indications' => ['nullable', 'string', 'max:5000'],
+            'directions' => ['nullable', 'string', 'max:5000'],
+            'side_effects' => ['nullable', 'string', 'max:5000'],
+            'warnings' => ['nullable', 'string', 'max:5000'],
+            'contraindications' => ['nullable', 'string', 'max:5000'],
+            'drug_interactions' => ['nullable', 'string', 'max:5000'],
+            'storage_instructions' => ['nullable', 'string', 'max:2000'],
             'prescription_required' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],

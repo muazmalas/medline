@@ -13,7 +13,8 @@ class Order extends Model
     protected $fillable = [
         'public_id', 'patient_id', 'pharmacy_id', 'address_id', 'status',
         'payment_method', 'payment_status', 'subtotal', 'delivery_fee', 'total',
-        'delivery_address_snapshot', 'patient_note',
+        'delivery_address_snapshot', 'patient_note', 'partial_offer_note', 'partial_offered_at',
+        'patient_decision_note', 'patient_decided_at',
     ];
 
     protected function casts(): array
@@ -22,6 +23,8 @@ class Order extends Model
             'subtotal' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'total' => 'decimal:2',
+            'partial_offered_at' => 'datetime',
+            'patient_decided_at' => 'datetime',
         ];
     }
 

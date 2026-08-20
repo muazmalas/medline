@@ -20,15 +20,64 @@ class SubscriptionController extends Controller
     public function current(Request $request): JsonResponse
     {
         $partner = Partner::where('user_id', $request->user()->id)->firstOrFail();
-        $subscription = DB::table('subscriptions')->where('partner_id', $partner->id)->latest()->first();
-        return response()->json(['partner' => $partner, 'subscription' => $subscription]);
+        $base = DB::table('subscriptions')->where('partner_id', $partner->id);
+        $today = now()->toDateString();
+        $activeSubscription = (clone $base)
+            ->whereIn('status', ['active', 'expiring_soon', 'grace'])
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhereDate('starts_at', '<=', $today))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhereDate('ends_at', '>=', $today))
+            ->orderByDesc('ends_at')
+            ->first();
+        $reviewSubscription = (clone $base)
+            ->whereIn('status', ['payment_under_review', 'correction_required'])
+            ->latest('created_at')
+            ->first();
+        $scheduledSubscription = (clone $base)
+            ->whereIn('status', ['active', 'expiring_soon'])
+            ->whereDate('starts_at', '>', $today)
+            ->orderBy('starts_at')
+            ->first();
+        $latestSubscription = (clone $base)->latest('created_at')->first();
+        $subscription = $reviewSubscription ?? $activeSubscription ?? $scheduledSubscription ?? $latestSubscription;
+        $paymentProof = $subscription
+            ? DB::table('payment_proofs')->where('subscription_id', $subscription->id)->latest('created_at')->first()
+            : null;
+        $accessActive = $partner->approval_status === 'approved'
+            && ($activeSubscription !== null || $partner->subscription_status === 'active');
+
+        return response()->json([
+            'partner' => $partner,
+            'subscription' => $subscription,
+            'active_subscription' => $activeSubscription,
+            'review_subscription' => $reviewSubscription,
+            'scheduled_subscription' => $scheduledSubscription,
+            'payment_proof' => $paymentProof,
+            'access_active' => $accessActive,
+            'access_status' => $accessActive ? 'active' : 'inactive',
+        ]);
+    }
+
+    public function publicPlans(): JsonResponse
+    {
+        return response()->json(['data' => $this->configuredPlans()]);
     }
 
     public function plans(Request $request): JsonResponse
     {
         $partner = Partner::where('user_id', $request->user()->id)->firstOrFail();
-        $plans = collect(config('medline.subscription_plans', []))->filter(fn (array $plan) => $plan['partner_type'] === $partner->type)->map(fn (array $plan, string $code) => ['code' => $code, 'partner_type' => $plan['partner_type'], 'duration_months' => $plan['duration_months'], 'amount' => $plan['amount'] !== null ? (float) $plan['amount'] : null])->values();
+        $plans = $this->configuredPlans()->where('partner_type', $partner->type)->values();
         return response()->json(['data' => $plans]);
+    }
+
+    private function configuredPlans()
+    {
+        return collect(config('medline.subscription_plans', []))->map(fn (array $plan, string $code) => [
+            'code' => $code,
+            'partner_type' => $plan['partner_type'],
+            'duration_months' => (int) $plan['duration_months'],
+            'amount' => $plan['amount'] !== null ? (float) $plan['amount'] : null,
+            'currency' => 'SYP',
+        ])->values();
     }
 
     public function updateProfile(Request $request): JsonResponse
@@ -79,15 +128,28 @@ class SubscriptionController extends Controller
                 $partner = Partner::whereKey($partner->id)->lockForUpdate()->firstOrFail();
                 $pending = DB::table('subscriptions')->where('partner_id', $partner->id)->where('status', 'payment_under_review')->lockForUpdate()->exists();
                 abort_unless(! $pending, 409, 'A subscription payment proof is already awaiting review.');
+                $correction = DB::table('subscriptions')->where('partner_id', $partner->id)->where('status', 'correction_required')->latest('created_at')->lockForUpdate()->first();
+                if ($correction) {
+                    $proof = DB::table('payment_proofs')->where('subscription_id', $correction->id)->latest('created_at')->lockForUpdate()->first();
+                    $oldPath = $proof?->file_path;
+                    DB::table('subscriptions')->where('id', $correction->id)->update(['plan_code' => $planCode, 'status' => 'payment_under_review', 'amount' => $data['amount'], 'duration_months' => $plan['duration_months'], 'updated_at' => now()]);
+                    if ($proof) {
+                        DB::table('payment_proofs')->where('id', $proof->id)->update(['submitted_by' => $request->user()->id, 'file_path' => $storedPath, 'status' => 'under_review', 'reviewed_by' => null, 'review_note' => null, 'reviewed_at' => null, 'updated_at' => now()]);
+                    } else {
+                        DB::table('payment_proofs')->insert(['subscription_id' => $correction->id, 'submitted_by' => $request->user()->id, 'file_path' => $storedPath, 'status' => 'under_review', 'created_at' => now(), 'updated_at' => now()]);
+                    }
+                    return ['message' => 'Corrected payment proof resubmitted for review.', 'subscription_id' => $correction->id, 'replaced_path' => $oldPath];
+                }
                 $subscriptionId = DB::table('subscriptions')->insertGetId(['partner_id' => $partner->id, 'plan_code' => $planCode, 'origin' => 'renewal', 'status' => 'payment_under_review', 'amount' => $data['amount'], 'duration_months' => $plan['duration_months'], 'starts_at' => null, 'ends_at' => null, 'created_at' => now(), 'updated_at' => now()]);
                 DB::table('payment_proofs')->insert(['subscription_id' => $subscriptionId, 'submitted_by' => $request->user()->id, 'file_path' => $storedPath, 'status' => 'under_review', 'created_at' => now(), 'updated_at' => now()]);
-                $partner->update(['subscription_status' => 'inactive']);
-                return ['message' => 'Payment proof submitted for review.', 'subscription_id' => $subscriptionId];
+                return ['message' => 'Payment proof submitted for review.', 'subscription_id' => $subscriptionId, 'replaced_path' => null];
             });
         } catch (\Throwable $exception) {
             if ($storedPath) Storage::delete($storedPath);
             throw $exception;
         }
+        if ($payload['replaced_path'] && $payload['replaced_path'] !== $storedPath) Storage::delete($payload['replaced_path']);
+        unset($payload['replaced_path']);
         AuditService::record($request, 'subscription.payment_proof_submitted', 'subscription', $payload['subscription_id'], ['partner_id' => $partner->id, 'plan_code' => $planCode, 'amount' => $data['amount'], 'duration_months' => $plan['duration_months']]);
         User::where('role', 'admin')->pluck('id')->each(fn ($adminId) => NotificationService::send($adminId, 'subscription.payment_submitted', ['subscription_id' => $payload['subscription_id'], 'message' => 'A subscription payment proof requires review.']));
         if ($idempotencyKey !== '') DB::table('idempotency_keys')->updateOrInsert(['user_id' => $request->user()->id, 'key' => $idempotencyKey], ['request_hash' => $requestHash, 'response_status' => 201, 'response_body' => json_encode($payload, JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now()]);

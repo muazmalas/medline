@@ -11,9 +11,21 @@ export type Medicine = {
   name_en: string
   name_ar: string
   manufacturer?: string
+  active_ingredient?: string
   form?: string
   dosage?: string
+  pack_size?: string
+  administration_route?: string
   code?: string
+  image_url?: string
+  description?: string
+  indications?: string
+  directions?: string
+  side_effects?: string
+  warnings?: string
+  contraindications?: string
+  drug_interactions?: string
+  storage_instructions?: string
   prescription_required: boolean
   is_active?: boolean
 }

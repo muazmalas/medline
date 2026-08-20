@@ -10,8 +10,10 @@ class Medicine extends Model
     use HasFactory;
 
     protected $fillable = [
-        'category_id', 'name_en', 'name_ar', 'manufacturer', 'form', 'dosage',
-        'code', 'image_path', 'prescription_required', 'is_active',
+        'category_id', 'name_en', 'name_ar', 'manufacturer', 'active_ingredient', 'form', 'dosage',
+        'pack_size', 'administration_route', 'code', 'image_path', 'description', 'indications',
+        'directions', 'side_effects', 'warnings', 'contraindications', 'drug_interactions',
+        'storage_instructions', 'prescription_required', 'is_active',
     ];
 
     protected function casts(): array

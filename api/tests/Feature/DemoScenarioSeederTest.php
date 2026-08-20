@@ -22,10 +22,11 @@ class DemoScenarioSeederTest extends TestCase
 
         $this->assertSame($firstCounts, $secondCounts);
         $this->assertSame(5, $secondCounts['orders']);
-        $this->assertSame(5, $secondCounts['deliveries']);
+        $this->assertSame(3, $secondCounts['deliveries']);
         $this->assertSame(3, $secondCounts['notifications']);
         $this->assertSame(5, $secondCounts['audit_logs']);
         $this->assertDatabaseHas('orders', ['public_id' => 'DEMO-ORDER-RX-0000001', 'status' => 'prescription_review']);
+        $this->assertDatabaseMissing('deliveries', ['order_id' => DB::table('orders')->where('public_id', 'DEMO-ORDER-RX-0000001')->value('id')]);
         $this->assertDatabaseHas('deliveries', ['status' => 'in_transit']);
         $this->assertDatabaseHas('procurement_orders', ['public_id' => 'DEMO-PROC-0000001', 'status' => 'pending_warehouse_review']);
         $this->assertDatabaseHas('complaints', ['subject' => 'Demo delivery feedback', 'status' => 'in_review']);

@@ -61,7 +61,7 @@ class OrderWorkflowController extends Controller
 
         $data = $request->validate([
             'decision' => ['required', 'in:accept,reject,partial'],
-            'items' => ['nullable', 'array'],
+            'items' => ['nullable', 'required_if:decision,partial', 'array'],
             'items.*.id' => ['required', 'integer'],
             'items.*.accepted_quantity' => ['required', 'integer', 'min:0'],
             'note' => ['nullable', 'string', 'max:1000'],
@@ -86,29 +86,39 @@ class OrderWorkflowController extends Controller
                 $lockedOrder->update(['status' => 'rejected']);
             } else {
                 $requested = collect($data['items'] ?? [])->keyBy('id');
+                $acceptedSubtotal = 0.0;
+                $acceptedUnits = 0;
+                $requestedUnits = (int) $lockedOrder->items->sum('quantity');
                 foreach ($lockedOrder->items as $item) {
                     $accepted = $data['decision'] === 'accept'
                         ? $item->quantity
                         : min($item->quantity, (int) ($requested[$item->id]['accepted_quantity'] ?? 0));
+                    $requiresPrescription = (bool) $item->prescription_required_snapshot || (bool) DB::table('medicines')->where('id', $item->medicine_id)->value('prescription_required');
+                    if ($accepted > 0 && $requiresPrescription) {
+                        $approvedPrescription = DB::table('prescriptions')->where('order_item_id', $item->id)->where('status', 'approved')->exists();
+                        abort_unless($approvedPrescription, 409, 'Every accepted prescription medicine must have its own approved prescription.');
+                    }
                     $this->releaseReservation($lockedOrder, $item, $accepted);
                     $item->update(['accepted_quantity' => $accepted]);
+                    $acceptedSubtotal += (float) $item->unit_price * $accepted;
+                    $acceptedUnits += $accepted;
                 }
-                $lockedOrder->update(['status' => $data['decision'] === 'accept' ? 'accepted' : 'partially_accepted']);
+                if ($data['decision'] === 'partial') {
+                    abort_unless($acceptedUnits > 0 && $acceptedUnits < $requestedUnits, 422, 'A partial offer must accept at least one item and leave at least one requested unit unaccepted.');
+                }
+                $lockedOrder->update([
+                    'status' => $data['decision'] === 'accept' ? 'accepted' : 'partial_approval_required',
+                    'subtotal' => $acceptedSubtotal,
+                    'total' => $acceptedSubtotal + (float) $lockedOrder->delivery_fee,
+                    'partial_offer_note' => $data['decision'] === 'partial' ? ($data['note'] ?? null) : null,
+                    'partial_offered_at' => $data['decision'] === 'partial' ? now() : null,
+                    'patient_decision_note' => null,
+                    'patient_decided_at' => null,
+                ]);
             }
 
             $deliveryId = null;
-            if (in_array($lockedOrder->status, ['accepted', 'partially_accepted'], true)) {
-                $pin = (string) random_int(100000, 999999);
-                $deliveryId = DB::table('deliveries')->insertGetId([
-                    'public_id' => (string) Str::ulid(),
-                    'order_id' => $lockedOrder->id,
-                    'status' => 'available',
-                    'pin_hash' => Hash::make($pin),
-                    'pin_encrypted' => Crypt::encryptString($pin),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            if ($lockedOrder->status === 'accepted') $deliveryId = $this->createDelivery($lockedOrder);
             return ['order' => $lockedOrder->fresh('items'), 'delivery_id' => $deliveryId];
         }, config('medline.database_transaction_attempts', 3));
 
@@ -132,6 +142,53 @@ class OrderWorkflowController extends Controller
         AuditService::record($request, 'order.' . $order->status, Order::class, $order->id, ['decision' => $data['decision'], 'note' => $data['note'] ?? null]);
 
         return response()->json(['message' => 'Order decision saved.', 'order' => $order]);
+    }
+
+    public function patientPartialDecision(Request $request, Order $order): JsonResponse
+    {
+        abort_unless($request->user()->role === 'patient' && $order->patient_id === $request->user()->id, 403);
+        $data = $request->validate(['decision' => ['required', 'in:approve,reject'], 'note' => ['nullable', 'string', 'max:1000']]);
+        $result = DatabaseTransaction::run(function () use ($request, $order, $data) {
+            $lockedOrder = Order::with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_unless($lockedOrder->patient_id === $request->user()->id && $lockedOrder->status === 'partial_approval_required', 409, 'This partial offer is no longer awaiting your decision.');
+            $deliveryId = null;
+            if ($data['decision'] === 'approve') {
+                $lockedOrder->update(['status' => 'partially_accepted', 'patient_decision_note' => $data['note'] ?? null, 'patient_decided_at' => now()]);
+                $deliveryId = $this->createDelivery($lockedOrder);
+            } else {
+                foreach ($lockedOrder->items as $item) {
+                    if ($item->accepted_quantity > 0) $this->releaseReservation($lockedOrder, $item, max(0, $item->quantity - $item->accepted_quantity));
+                }
+                $lockedOrder->update(['status' => 'partial_offer_rejected', 'patient_decision_note' => $data['note'] ?? null, 'patient_decided_at' => now()]);
+            }
+            return ['order' => $lockedOrder->fresh('items'), 'delivery_id' => $deliveryId];
+        }, config('medline.database_transaction_attempts', 3));
+
+        if ($result['delivery_id']) {
+            NotificationService::send($order->patient_id, 'delivery.created', ['delivery_id' => $result['delivery_id'], 'message' => 'Your approved partial order is ready for delivery.']);
+            NotificationService::send($order->patient_id, 'delivery.pin_available', ['delivery_id' => $result['delivery_id'], 'message' => 'Your delivery PIN is available in the secure order screen.']);
+            DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.available', ['delivery_id' => $result['delivery_id'], 'message' => 'A new delivery job is available.']));
+        }
+        $pharmacyUserId = Partner::whereKey($order->pharmacy_id)->value('user_id');
+        if ($pharmacyUserId) NotificationService::send($pharmacyUserId, 'order.partial_offer_' . $data['decision'], ['order_id' => $order->public_id, 'status' => $result['order']->status, 'message' => 'The patient ' . ($data['decision'] === 'approve' ? 'approved' : 'declined') . ' the partial order offer.']);
+        AuditService::record($request, 'order.partial_offer_' . $data['decision'], Order::class, $order->id, ['note' => $data['note'] ?? null]);
+        return response()->json(['message' => $data['decision'] === 'approve' ? 'Partial order approved and sent to delivery.' : 'Partial order declined.', ...$result]);
+    }
+
+    private function createDelivery(Order $order): int
+    {
+        $existing = DB::table('deliveries')->where('order_id', $order->id)->value('id');
+        if ($existing) return (int) $existing;
+        $pin = (string) random_int(100000, 999999);
+        return DB::table('deliveries')->insertGetId([
+            'public_id' => (string) Str::ulid(),
+            'order_id' => $order->id,
+            'status' => 'available',
+            'pin_hash' => Hash::make($pin),
+            'pin_encrypted' => Crypt::encryptString($pin),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function releaseReservation(Order $order, object $item, int $accepted = 0): void

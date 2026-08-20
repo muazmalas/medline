@@ -263,6 +263,26 @@ class AuthController extends Controller
         return response()->json(['message' => 'Profile updated.', 'user' => $request->user()->fresh()]);
     }
 
+    public function changePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+        ]);
+        abort_unless(Hash::check($data['current_password'], $request->user()->password), 422, 'The current password is incorrect.');
+        DatabaseTransaction::run(function () use ($request, $data) {
+            $user = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            abort_unless(Hash::check($data['current_password'], $user->password), 422, 'The current password is incorrect.');
+            $user->update(['password' => $data['password']]);
+            $currentToken = $request->user()->currentAccessToken();
+            $currentTokenId = $currentToken && method_exists($currentToken, 'getKey') ? $currentToken->getKey() : null;
+            $user->tokens()->when($currentTokenId, fn ($query) => $query->where('id', '!=', $currentTokenId))->delete();
+            RefreshToken::where('user_id', $user->id)->update(['revoked_at' => now(), 'updated_at' => now()]);
+        });
+        AuditService::record($request, 'profile.password_changed', User::class, $request->user()->id);
+        return response()->json(['message' => 'Password changed. Other sessions were signed out.']);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $data = $request->validate(['refresh_token' => ['sometimes', 'nullable', 'string', 'min:40', 'max:255']]);

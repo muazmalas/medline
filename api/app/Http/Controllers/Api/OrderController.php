@@ -57,7 +57,26 @@ class OrderController extends Controller
         $canView = $canView || ($user->role === 'pharmacy' && $order->pharmacy_id === DB::table('partners')->where('user_id', $user->id)->value('id'));
         $canView = $canView || ($user->role === 'driver' && DB::table('deliveries')->join('drivers', 'drivers.id', '=', 'deliveries.driver_id')->where('deliveries.order_id', $order->id)->where('drivers.user_id', $user->id)->exists());
         abort_unless($canView, 403);
-        $order->load('items');
+        $items = DB::table('order_items')
+            ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
+            ->where('order_items.order_id', $order->id)
+            ->select('order_items.*', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.form', 'medicines.dosage', 'medicines.image_path', 'medicines.prescription_required')
+            ->orderBy('order_items.id')
+            ->get();
+        $prescriptions = DB::table('prescriptions')->where('order_id', $order->id)->latest('created_at')->get()->groupBy('order_item_id');
+        $items->each(function ($item) use ($prescriptions) {
+            $current = $prescriptions->get($item->id)?->first();
+            $item->prescription = $current ? [
+                'id' => $current->id,
+                'status' => $current->status,
+                'review_note' => $current->review_note,
+                'created_at' => $current->created_at,
+                'reviewed_at' => $current->reviewed_at,
+            ] : null;
+            $item->requested_line_total = (float) $item->unit_price * (int) $item->quantity;
+            $item->accepted_line_total = (float) $item->unit_price * (int) $item->accepted_quantity;
+        });
+        $order->setRelation('items', $items);
         $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
             $delivery->driver = $delivery->driver_id
@@ -92,6 +111,8 @@ class OrderController extends Controller
             'timeline' => $events,
             'rating' => $rating,
             'invoice' => [
+                'requested_subtotal' => $items->sum('requested_line_total'),
+                'accepted_subtotal' => $items->sum('accepted_line_total'),
                 'subtotal' => $order->subtotal,
                 'delivery_fee' => $order->delivery_fee,
                 'total' => $order->total,
@@ -126,7 +147,7 @@ class OrderController extends Controller
             'delivery_fee' => ['nullable', 'numeric', 'min:0'],
             'patient_note' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.medicine_id' => ['required', 'integer', 'exists:medicines,id'],
+            'items.*.medicine_id' => ['required', 'integer', 'distinct', 'exists:medicines,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -188,6 +209,7 @@ class OrderController extends Controller
                     OrderItem::create([
                         'order_id' => $order->id,
                         'medicine_id' => $item['medicine_id'],
+                        'prescription_required_snapshot' => (bool) $medicine->prescription_required,
                         'quantity' => $item['quantity'],
                         'unit_price' => $inventory->unit_price,
                         'line_total' => $lineTotal,
@@ -249,11 +271,12 @@ class OrderController extends Controller
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
         $cancelled = DatabaseTransaction::run(function () use ($order, $data, $request) {
             $locked = Order::with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($locked->status, ['prescription_required', 'pending_pharmacy_review', 'prescription_review', 'accepted', 'partially_accepted', 'ready_for_delivery'], true), 409, 'This order can no longer be cancelled.');
+            abort_unless(in_array($locked->status, ['prescription_required', 'pending_pharmacy_review', 'prescription_review', 'partial_approval_required', 'accepted', 'partially_accepted', 'ready_for_delivery'], true), 409, 'This order can no longer be cancelled.');
             $delivery = DB::table('deliveries')->where('order_id', $locked->id)->lockForUpdate()->first();
             abort_unless(! $delivery || in_array($delivery->status, ['available', 'failed'], true), 409, 'This order is already in delivery.');
+            $usesAcceptedQuantities = in_array($locked->status, ['partial_approval_required', 'accepted', 'partially_accepted', 'ready_for_delivery'], true);
             foreach ($locked->items as $item) {
-                $release = $item->accepted_quantity > 0 ? $item->accepted_quantity : $item->quantity;
+                $release = $usesAcceptedQuantities ? $item->accepted_quantity : $item->quantity;
                 $inventory = DB::table('inventories')->where('owner_type', 'pharmacy')->where('owner_id', $locked->pharmacy_id)->where('medicine_id', $item->medicine_id)->lockForUpdate()->first();
                 if ($inventory) DB::table('inventories')->where('id', $inventory->id)->update(['reserved_quantity' => max(0, $inventory->reserved_quantity - $release), 'updated_at' => now()]);
             }

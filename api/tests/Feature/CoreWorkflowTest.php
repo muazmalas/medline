@@ -88,6 +88,6 @@ class CoreWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('subscriptions', ['partner_id' => $partner->id, 'status' => 'payment_under_review']);
         $this->assertDatabaseHas('payment_proofs', ['submitted_by' => $user->id, 'status' => 'under_review']);
-        $this->assertDatabaseHas('partners', ['id' => $partner->id, 'subscription_status' => 'inactive']);
+        $this->assertDatabaseHas('partners', ['id' => $partner->id, 'subscription_status' => 'active']);
     }
 }

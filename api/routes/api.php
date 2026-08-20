@@ -43,13 +43,16 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
     Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth');
     Route::get('/medicines', [MedicineController::class, 'index']);
     Route::get('/medicines/suggestions', [MedicineController::class, 'suggestions']);
+    Route::get('/medicines/{medicine}', [MedicineController::class, 'show'])->whereNumber('medicine');
     Route::get('/medicine-categories', [MedicineCategoryController::class, 'index']);
     Route::get('/partners', [PartnerController::class, 'index']);
     Route::get('/partners/{partner}', [PartnerController::class, 'show']);
+    Route::get('/subscription-plans', [SubscriptionController::class, 'publicPlans']);
 
     Route::middleware(['auth:sanctum', 'idempotency'])->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('throttle:mutations');
+        Route::post('/profile/password', [AuthController::class, 'changePassword'])->middleware('throttle:auth');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('throttle:auth');
         Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:auth');
         Route::post('/devices/tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:mutations');
@@ -78,6 +81,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::put('/cart/items', [CartController::class, 'update'])->middleware('throttle:mutations');
         Route::delete('/cart', [CartController::class, 'clear'])->middleware('throttle:mutations');
         Route::post('/orders/{order}/prescription', [PrescriptionController::class, 'store'])->middleware('throttle:uploads');
+        Route::post('/orders/{order}/items/{item}/prescription', [PrescriptionController::class, 'storeForItem'])->middleware('throttle:uploads');
         Route::get('/pharmacy/prescriptions', [PrescriptionController::class, 'pharmacyIndex']);
         Route::get('/procurement', [ProcurementController::class, 'index']);
         Route::get('/procurement/{procurement}', [ProcurementController::class, 'show']);
@@ -85,6 +89,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::post('/procurement/{procurement}/decision', [ProcurementController::class, 'decide'])->middleware('throttle:mutations');
         Route::get('/partner/orders', [OrderWorkflowController::class, 'partnerOrders']);
         Route::post('/partner/orders/{order}/decision', [OrderWorkflowController::class, 'decide'])->middleware('throttle:mutations');
+        Route::post('/orders/{order}/partial-offer/decision', [OrderWorkflowController::class, 'patientPartialDecision'])->middleware('throttle:mutations');
         Route::get('/partner/inventory', [InventoryController::class, 'index']);
         Route::put('/partner/inventory', [InventoryController::class, 'upsert'])->middleware('throttle:mutations');
         Route::get('/notifications', [NotificationController::class, 'index']);
