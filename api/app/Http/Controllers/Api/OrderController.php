@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
 use App\Support\NotificationService;
 use App\Support\AuditService;
 use App\Support\DatabaseTransaction;
+use App\Services\DeliveryPricingService;
+use Carbon\Carbon;
 
 class OrderController extends Controller
 {
@@ -37,6 +39,7 @@ class OrderController extends Controller
             })
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->orderBy($sortBy, $sortDirection)
+            ->orderBy('id', $sortDirection)
             ->paginate(min($request->integer('per_page', 15), 50));
         $orders->getCollection()->transform(function ($record) {
             $record->customer_name = DB::table('users')->where('id', $record->patient_id)->value('name');
@@ -77,7 +80,7 @@ class OrderController extends Controller
             $item->accepted_line_total = (float) $item->unit_price * (int) $item->accepted_quantity;
         });
         $order->setRelation('items', $items);
-        $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
+        $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'scheduled_for', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
             $delivery->driver = $delivery->driver_id
                 ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $delivery->driver_id)->select('drivers.id as driver_id', 'users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
@@ -99,7 +102,13 @@ class OrderController extends Controller
         $pickup = DB::table('partners')->where('id', $order->pharmacy_id)->select('business_name as label', 'address', 'latitude', 'longitude')->first();
         $dropoff = $order->address_id
             ? DB::table('addresses')->where('id', $order->address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
-            : null;
+            : ($order->delivery_latitude !== null && $order->delivery_longitude !== null ? (object) [
+                'label' => $order->delivery_address_snapshot,
+                'city' => null,
+                'district' => null,
+                'latitude' => (float) $order->delivery_latitude,
+                'longitude' => (float) $order->delivery_longitude,
+            ] : null);
 
         return response()->json([
             'order' => $order,
@@ -114,7 +123,12 @@ class OrderController extends Controller
                 'requested_subtotal' => $items->sum('requested_line_total'),
                 'accepted_subtotal' => $items->sum('accepted_line_total'),
                 'subtotal' => $order->subtotal,
+                'tax_rate' => $order->tax_rate,
+                'tax_amount' => $order->tax_amount,
                 'delivery_fee' => $order->delivery_fee,
+                'delivery_distance_km' => $order->delivery_distance_km,
+                'delivery_rate_per_km' => $order->delivery_rate_per_km,
+                'delivery_pricing_rate_id' => $order->delivery_pricing_rate_id,
                 'total' => $order->total,
                 'payment_method' => $order->payment_method,
                 'payment_status' => $order->payment_status,
@@ -122,7 +136,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, DeliveryPricingService $pricing): JsonResponse
     {
         if ($request->user()->role !== 'patient') {
             return response()->json(['message' => 'Only patients can create patient orders.', 'code' => 'ORDER_ROLE_FORBIDDEN'], 403);
@@ -144,16 +158,28 @@ class OrderController extends Controller
             'pharmacy_id' => ['required', 'integer', 'exists:partners,id'],
             'address_id' => ['nullable', 'integer', 'exists:addresses,id'],
             'delivery_address_snapshot' => ['nullable', 'required_without:address_id', 'string', 'max:1000'],
-            'delivery_fee' => ['nullable', 'numeric', 'min:0'],
+            'delivery_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:delivery_longitude'],
+            'delivery_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:delivery_latitude'],
+            'delivery_preference' => ['nullable', 'in:asap,scheduled'],
+            'delivery_vehicle_type' => ['nullable', 'in:'.implode(',', $pricing->vehicleTypes())],
+            'scheduled_delivery_at' => ['nullable', 'required_if:delivery_preference,scheduled', 'date', 'after:now'],
             'patient_note' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.medicine_id' => ['required', 'integer', 'distinct', 'exists:medicines,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
+        $deliveryLatitude = isset($data['delivery_latitude']) ? (float) $data['delivery_latitude'] : null;
+        $deliveryLongitude = isset($data['delivery_longitude']) ? (float) $data['delivery_longitude'] : null;
+        $deliveryPreference = $data['delivery_preference'] ?? 'asap';
+        $scheduledDeliveryAt = $deliveryPreference === 'scheduled'
+            ? Carbon::parse($data['scheduled_delivery_at'])->utc()
+            : null;
         if (! empty($data['address_id'])) {
             $address = DB::table('addresses')->where('id', $data['address_id'])->where('user_id', $request->user()->id)->firstOrFail();
             $data['delivery_address_snapshot'] = implode(', ', array_filter([$address->address_line, $address->district, $address->city]));
+            $deliveryLatitude = $address->latitude !== null ? (float) $address->latitude : $deliveryLatitude;
+            $deliveryLongitude = $address->longitude !== null ? (float) $address->longitude : $deliveryLongitude;
         }
 
         $pharmacy = Partner::where('id', $data['pharmacy_id'])
@@ -167,7 +193,7 @@ class OrderController extends Controller
         }
 
         try {
-            $order = DatabaseTransaction::run(function () use ($data, $request) {
+            $order = DatabaseTransaction::run(function () use ($data, $request, $deliveryLatitude, $deliveryLongitude, $deliveryPreference, $scheduledDeliveryAt, $pricing) {
                 $pharmacy = Partner::where('id', $data['pharmacy_id'])
                     ->where('type', 'pharmacy')
                     ->where('approval_status', 'approved')
@@ -175,7 +201,19 @@ class OrderController extends Controller
                     ->lockForUpdate()
                     ->first();
                 if (! $pharmacy) throw new \RuntimeException('PHARMACY_UNAVAILABLE');
+                $vehicleType = $pricing->normalizeVehicleType($data['delivery_vehicle_type'] ?? null);
+                $currentRate = $pricing->current($vehicleType, true);
+                $deliveryPricing = [
+                    'pricing_rate_id' => $currentRate->id ? (int) $currentRate->id : null,
+                    'distance_km' => null,
+                    'rate_per_km' => (float) $currentRate->rate_per_km,
+                    'fee' => 0.0,
+                ];
+                if ($pharmacy->latitude !== null && $pharmacy->longitude !== null && $deliveryLatitude !== null && $deliveryLongitude !== null) {
+                    $deliveryPricing = $pricing->estimate((float) $pharmacy->latitude, (float) $pharmacy->longitude, $deliveryLatitude, $deliveryLongitude, $currentRate);
+                }
                 $requiresPrescription = false;
+                $taxRate = max(0, (float) config('medline.tax_rate', 0));
                 $order = Order::create([
                     'public_id' => (string) Str::ulid(),
                     'patient_id' => $request->user()->id,
@@ -183,8 +221,18 @@ class OrderController extends Controller
                     'status' => 'pending_pharmacy_review',
                     'payment_method' => 'cash_on_delivery',
                     'payment_status' => 'pending',
-                    'delivery_fee' => $data['delivery_fee'] ?? 0,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => 0,
+                    'delivery_fee' => $deliveryPricing['fee'],
+                    'delivery_pricing_rate_id' => $deliveryPricing['pricing_rate_id'],
+                    'delivery_distance_km' => $deliveryPricing['distance_km'],
+                    'delivery_rate_per_km' => $deliveryPricing['rate_per_km'],
+                    'delivery_vehicle_type' => $vehicleType,
+                    'delivery_latitude' => $deliveryLatitude,
+                    'delivery_longitude' => $deliveryLongitude,
                     'delivery_address_snapshot' => $data['delivery_address_snapshot'],
+                    'delivery_preference' => $deliveryPreference,
+                    'scheduled_delivery_at' => $scheduledDeliveryAt,
                     'patient_note' => $data['patient_note'] ?? null,
                 ]);
 
@@ -221,7 +269,8 @@ class OrderController extends Controller
                     ]);
                 }
 
-                $order->update(['status' => $requiresPrescription ? 'prescription_required' : 'pending_pharmacy_review', 'subtotal' => $subtotal, 'total' => $subtotal + ($data['delivery_fee'] ?? 0)]);
+                $taxAmount = round($subtotal * $taxRate / 100, 2);
+                $order->update(['status' => $requiresPrescription ? 'prescription_required' : 'pending_pharmacy_review', 'subtotal' => $subtotal, 'tax_amount' => $taxAmount, 'total' => $subtotal + $taxAmount + $deliveryPricing['fee']]);
                 return $order->load('items');
             }, config('medline.database_transaction_attempts', 3));
         } catch (\RuntimeException $exception) {
@@ -248,7 +297,7 @@ class OrderController extends Controller
             'status' => $order->status,
             'message' => $order->status === 'prescription_required' ? 'Your order was submitted. Upload a prescription to continue.' : 'Your order was submitted successfully.',
         ]);
-        AuditService::record($request, 'order.created', Order::class, $order->id, ['pharmacy_id' => $order->pharmacy_id, 'total' => $order->total]);
+        AuditService::record($request, 'order.created', Order::class, $order->id, ['pharmacy_id' => $order->pharmacy_id, 'subtotal' => $order->subtotal, 'tax_rate' => $order->tax_rate, 'tax_amount' => $order->tax_amount, 'total' => $order->total, 'delivery_distance_km' => $order->delivery_distance_km, 'delivery_rate_per_km' => $order->delivery_rate_per_km, 'delivery_vehicle_type' => $order->delivery_vehicle_type, 'delivery_fee' => $order->delivery_fee, 'delivery_pricing_rate_id' => $order->delivery_pricing_rate_id, 'delivery_preference' => $order->delivery_preference, 'scheduled_delivery_at' => $order->scheduled_delivery_at]);
 
         $payload = ['message' => 'Order created successfully.', 'order' => $order];
         if ($idempotencyKey !== '') {
@@ -271,10 +320,10 @@ class OrderController extends Controller
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
         $cancelled = DatabaseTransaction::run(function () use ($order, $data, $request) {
             $locked = Order::with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($locked->status, ['prescription_required', 'pending_pharmacy_review', 'prescription_review', 'partial_approval_required', 'accepted', 'partially_accepted', 'ready_for_delivery'], true), 409, 'This order can no longer be cancelled.');
+            abort_unless(in_array($locked->status, ['prescription_required', 'pending_pharmacy_review', 'prescription_review', 'partial_approval_required', 'accepted', 'partially_accepted'], true), 409, 'This order can no longer be cancelled.');
             $delivery = DB::table('deliveries')->where('order_id', $locked->id)->lockForUpdate()->first();
             abort_unless(! $delivery || in_array($delivery->status, ['available', 'failed'], true), 409, 'This order is already in delivery.');
-            $usesAcceptedQuantities = in_array($locked->status, ['partial_approval_required', 'accepted', 'partially_accepted', 'ready_for_delivery'], true);
+            $usesAcceptedQuantities = in_array($locked->status, ['partial_approval_required', 'accepted', 'partially_accepted'], true);
             foreach ($locked->items as $item) {
                 $release = $usesAcceptedQuantities ? $item->accepted_quantity : $item->quantity;
                 $inventory = DB::table('inventories')->where('owner_type', 'pharmacy')->where('owner_id', $locked->pharmacy_id)->where('medicine_id', $item->medicine_id)->lockForUpdate()->first();

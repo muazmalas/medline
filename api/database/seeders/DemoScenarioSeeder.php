@@ -38,9 +38,11 @@ class DemoScenarioSeeder extends Seeder
         $driverId = $this->driver($driver->id);
         $addressId = $this->address($patient->id);
         $categoryId = $this->category();
-        $paracetamolId = $this->medicine('MED-PARA-500', $categoryId, 'Paracetamol 500mg', false);
-        $ibuprofenId = $this->medicine('MED-IBU-400', $categoryId, 'Ibuprofen 400mg', false);
-        $antibioticId = $this->medicine('MED-AMOX-500', $categoryId, 'Amoxicillin 500mg', true);
+        $paracetamolId = $this->medicine('MED-PARA-500', $categoryId, 'Paracetamol 500mg', false, '500mg');
+        $ibuprofenId = $this->medicine('MED-IBU-400', $categoryId, 'Ibuprofen 400mg', false, '400mg');
+        $antibioticId = $this->medicine('MED-AMOX-500', $categoryId, 'Amoxicillin 500mg', true, '500mg');
+        $cetirizineId = $this->medicine('MED-CET-10', $categoryId, 'Cetirizine 10mg', false, '10mg');
+        $azithromycinId = $this->medicine('MED-AZI-250', $categoryId, 'Azithromycin 250mg', true, '250mg');
 
         $this->inventory($pharmacyId, $paracetamolId, 'pharmacy', 120, 500, 10);
         $this->inventory($pharmacyId, $ibuprofenId, 'pharmacy', 80, 750, 10);
@@ -48,6 +50,8 @@ class DemoScenarioSeeder extends Seeder
         $this->inventory($warehouseId, $paracetamolId, 'warehouse', 1000, 420, 50);
         $this->inventory($warehouseId, $ibuprofenId, 'warehouse', 700, 600, 50);
         $this->inventory($warehouseId, $antibioticId, 'warehouse', 300, 1500, 25);
+        $this->inventory($warehouseId, $cetirizineId, 'warehouse', 450, 550, 35);
+        $this->inventory($warehouseId, $azithromycinId, 'warehouse', 240, 1350, 20);
 
         $this->preferences([$admin->id, $pharmacyUser->id, $warehouseUser->id, $patient->id, $driver->id, $support->id]);
         $this->consents($patient->id);
@@ -101,9 +105,9 @@ class DemoScenarioSeeder extends Seeder
         return (int) DB::table('medicine_categories')->where('slug', 'demo-general')->value('id');
     }
 
-    private function medicine(string $code, int $categoryId, string $name, bool $rx): int
+    private function medicine(string $code, int $categoryId, string $name, bool $rx, string $dosage): int
     {
-        DB::table('medicines')->updateOrInsert(['code' => $code], ['category_id' => $categoryId, 'name_en' => $name, 'name_ar' => $name, 'manufacturer' => 'MedLine Labs', 'form' => 'Tablets', 'dosage' => str_contains($name, 'Amoxicillin') ? '500mg' : 'Standard', 'prescription_required' => $rx, 'is_active' => true, 'updated_at' => now(), 'created_at' => now()]);
+        DB::table('medicines')->updateOrInsert(['code' => $code], ['category_id' => $categoryId, 'name_en' => $name, 'name_ar' => $name, 'manufacturer' => 'MedLine Labs', 'form' => 'Tablets', 'dosage' => $dosage, 'prescription_required' => $rx, 'is_active' => true, 'updated_at' => now(), 'created_at' => now()]);
         return (int) DB::table('medicines')->where('code', $code)->value('id');
     }
 

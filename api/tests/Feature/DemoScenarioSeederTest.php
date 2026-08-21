@@ -30,6 +30,15 @@ class DemoScenarioSeederTest extends TestCase
         $this->assertDatabaseHas('deliveries', ['status' => 'in_transit']);
         $this->assertDatabaseHas('procurement_orders', ['public_id' => 'DEMO-PROC-0000001', 'status' => 'pending_warehouse_review']);
         $this->assertDatabaseHas('complaints', ['subject' => 'Demo delivery feedback', 'status' => 'in_review']);
+        $warehouseId = DB::table('partners')->where('license_number', 'MEDLINE-WH-001')->value('id');
+        $this->assertDatabaseHas('partners', ['id' => $warehouseId, 'address' => 'Aleppo, Sheikh Najjar Industrial City', 'latitude' => 36.2727800, 'longitude' => 37.2563900]);
+        $this->assertSame(5, DB::table('inventories')->where('owner_type', 'warehouse')->where('owner_id', $warehouseId)->count());
+        $this->assertDatabaseHas('inventories', ['owner_type' => 'warehouse', 'owner_id' => $warehouseId, 'medicine_id' => DB::table('medicines')->where('code', 'MED-CET-10')->value('id'), 'quantity' => 450]);
+        $adminId = DB::table('users')->where('email', 'admin@medline.local')->value('id');
+        $pharmacyUserId = DB::table('users')->where('email', 'pharmacy@medline.local')->value('id');
+        $this->assertDatabaseMissing('partners', ['user_id' => $adminId]);
+        $this->assertDatabaseHas('partners', ['user_id' => $pharmacyUserId, 'type' => 'pharmacy', 'license_number' => 'MEDLINE-PH-001']);
+        $this->assertSame(4, DB::table('delivery_pricing_rates')->distinct()->count('vehicle_type'));
     }
 
     private function demoCounts(): array

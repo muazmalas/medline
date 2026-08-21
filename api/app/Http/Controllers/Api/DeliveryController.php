@@ -12,14 +12,28 @@ use App\Support\NotificationService;
 use Illuminate\Support\Facades\Crypt;
 use App\Support\AuditService;
 use App\Support\DatabaseTransaction;
+use App\Services\ProcurementBatchService;
+use App\Services\DeliveryPricingService;
 
 class DeliveryController extends Controller
 {
-    public function show(Request $request, int $delivery): JsonResponse
+    public function show(Request $request, int $delivery, DeliveryPricingService $pricing): JsonResponse
     {
-        $row = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.id', $delivery)->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.patient_id', 'orders.address_id as order_address_id', 'orders.pharmacy_id as order_pharmacy_id', 'procurement_orders.pharmacy_id as procurement_pharmacy_id', 'procurement_orders.warehouse_id', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->firstOrFail();
+        $row = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.id', $delivery)->select('deliveries.id', 'deliveries.public_id', 'deliveries.order_id', 'deliveries.procurement_order_id', 'deliveries.status', 'deliveries.scheduled_for', 'deliveries.driver_id', 'deliveries.claimed_at', 'deliveries.completed_at', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.patient_id', 'orders.address_id as order_address_id', 'orders.delivery_latitude as order_delivery_latitude', 'orders.delivery_longitude as order_delivery_longitude', 'orders.pharmacy_id as order_pharmacy_id', 'procurement_orders.pharmacy_id as procurement_pharmacy_id', 'procurement_orders.warehouse_id', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.delivery_fee, procurement_orders.delivery_fee) as job_price'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'), DB::raw('COALESCE(orders.delivery_distance_km, procurement_orders.delivery_distance_km) as delivery_distance_km'), DB::raw('COALESCE(orders.delivery_rate_per_km, procurement_orders.delivery_rate_per_km) as delivery_rate_per_km'), DB::raw("COALESCE(orders.delivery_vehicle_type, procurement_orders.delivery_vehicle_type, 'motorcycle') as delivery_vehicle_type"))->firstOrFail();
         $allowed = $request->user()->role === 'admin' || (int) $row->patient_id === (int) $request->user()->id;
-        if ($request->user()->role === 'driver') $allowed = (int) DB::table('drivers')->where('user_id', $request->user()->id)->value('id') === (int) $row->driver_id;
+        $viewingDriver = null;
+        if ($request->user()->role === 'driver') {
+            $viewingDriver = DB::table('drivers')->where('user_id', $request->user()->id)->first();
+            $assignedToDriver = $viewingDriver && (int) $viewingDriver->id === (int) $row->driver_id;
+            $availableToDriver = $viewingDriver
+                && $viewingDriver->approval_status === 'approved'
+                && (bool) $viewingDriver->is_available
+                && $row->status === 'available'
+                && ! $row->driver_id
+                && $pricing->normalizeVehicleType($viewingDriver->vehicle_type) === $pricing->normalizeVehicleType($row->delivery_vehicle_type);
+            $allowed = $assignedToDriver || $availableToDriver;
+            $row->can_claim = $availableToDriver;
+        }
         if (in_array($request->user()->role, ['pharmacy', 'warehouse'], true)) {
             $partnerId = (int) DB::table('partners')->where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('subscription_status', 'active')->value('id');
             $allowed = $partnerId > 0 && in_array($partnerId, [(int) $row->order_pharmacy_id, (int) $row->procurement_pharmacy_id, (int) $row->warehouse_id], true);
@@ -31,10 +45,21 @@ class DeliveryController extends Controller
         $pickup = DB::table('partners')->where('id', $pickupPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first();
         $dropoff = $row->order_address_id
             ? DB::table('addresses')->where('id', $row->order_address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
-            : ($dropoffPartnerId ? DB::table('partners')->where('id', $dropoffPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first() : null);
+            : ($row->order_delivery_latitude !== null && $row->order_delivery_longitude !== null
+                ? (object) [
+                    'label' => $row->delivery_address_snapshot,
+                    'city' => null,
+                    'district' => null,
+                    'latitude' => (float) $row->order_delivery_latitude,
+                    'longitude' => (float) $row->order_delivery_longitude,
+                ]
+                : ($dropoffPartnerId ? DB::table('partners')->where('id', $dropoffPartnerId)->select('business_name as label', 'address', 'latitude', 'longitude')->first() : null));
         $driver = $row->driver_id
             ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $row->driver_id)->select('drivers.id as driver_id', 'users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
             : null;
+        $items = $row->order_id
+            ? DB::table('order_items')->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')->where('order_items.order_id', $row->order_id)->select('order_items.id', 'order_items.medicine_id', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.form', 'medicines.dosage', 'order_items.quantity as requested_quantity', DB::raw('CASE WHEN order_items.accepted_quantity > 0 THEN order_items.accepted_quantity ELSE order_items.quantity END as pickup_quantity'))->get()
+            : DB::table('procurement_order_items')->join('medicines', 'medicines.id', '=', 'procurement_order_items.medicine_id')->where('procurement_order_items.procurement_order_id', $row->procurement_order_id)->select('procurement_order_items.id', 'procurement_order_items.medicine_id', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.form', 'medicines.dosage', 'procurement_order_items.quantity as requested_quantity', DB::raw('CASE WHEN procurement_order_items.accepted_quantity > 0 THEN procurement_order_items.accepted_quantity ELSE procurement_order_items.quantity END as pickup_quantity'))->get();
         $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
         if (! in_array($row->status, ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'], true) || ! $row->location_updated_at || strtotime((string) $row->location_updated_at) < $locationFreshAfter->timestamp) {
             $row->last_latitude = null;
@@ -42,9 +67,10 @@ class DeliveryController extends Controller
             $row->location_accuracy_meters = null;
             $row->location_updated_at = null;
         }
-        unset($row->patient_id, $row->order_address_id, $row->order_pharmacy_id, $row->procurement_pharmacy_id, $row->warehouse_id);
+        $row->source_type = $row->order_id ? 'patient_order' : 'procurement_order';
+        unset($row->patient_id, $row->order_address_id, $row->order_delivery_latitude, $row->order_delivery_longitude, $row->order_pharmacy_id, $row->procurement_pharmacy_id, $row->warehouse_id, $row->order_id, $row->procurement_order_id);
         $row->driver = $driver;
-        return response()->json(['delivery' => $row, 'route' => ['pickup' => $pickup, 'dropoff' => $dropoff], 'events' => $events]);
+        return response()->json(['delivery' => $row, 'route' => ['pickup' => $pickup, 'dropoff' => $dropoff], 'items' => $items, 'events' => $events]);
     }
 
     public function mine(Request $request): JsonResponse
@@ -61,11 +87,20 @@ class DeliveryController extends Controller
             $query->where('orders.patient_id', $request->user()->id);
         }
 
+        $query
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
+                $like = '%' . $request->string('search')->toString() . '%';
+                $query->where(fn ($nested) => $nested->where('deliveries.public_id', 'like', $like)->orWhere('orders.public_id', 'like', $like)->orWhere('procurement_orders.public_id', 'like', $like)->orWhere('deliveries.status', 'like', $like)->orWhere('orders.delivery_address_snapshot', 'like', $like)->orWhere('procurement_orders.delivery_address_snapshot', 'like', $like));
+            })
+            ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('deliveries.status', $request->string('status')->toString()));
+        $sortBy = match ($request->string('sort_by')->toString()) { 'public_id' => 'deliveries.public_id', 'related_order' => 'order_public_id', 'delivery_address_snapshot' => 'delivery_address_snapshot', 'scheduled_for' => 'deliveries.scheduled_for', 'status' => 'deliveries.status', 'job_price' => 'job_price', 'total' => 'total', default => 'deliveries.created_at' };
+        $direction = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
         $deliveries = $query
-            ->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.completed_at', 'deliveries.pin_used_at', 'deliveries.pin_encrypted', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))
-            ->latest('deliveries.created_at')
-            ->get()
-            ->map(function ($delivery) use ($request) {
+            ->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.scheduled_for', 'deliveries.driver_id', 'deliveries.created_at', 'deliveries.completed_at', 'deliveries.pin_used_at', 'deliveries.pin_encrypted', 'deliveries.last_latitude', 'deliveries.last_longitude', 'deliveries.location_accuracy_meters', 'deliveries.location_updated_at', 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.delivery_fee, procurement_orders.delivery_fee) as job_price'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))
+            ->orderBy($sortBy, $direction)
+            ->orderBy('deliveries.id', $direction)
+            ->paginate(min($request->integer('per_page', 20), 100));
+        $deliveries->getCollection()->transform(function ($delivery) use ($request) {
                 if ($request->user()->role === 'patient' && $delivery->status !== 'delivered' && ! $delivery->pin_used_at) {
                     $delivery->delivery_pin = $delivery->pin_encrypted ? Crypt::decryptString($delivery->pin_encrypted) : null;
                 }
@@ -79,13 +114,15 @@ class DeliveryController extends Controller
                 unset($delivery->pin_encrypted);
                 return $delivery;
             });
-        return response()->json(['data' => $deliveries]);
+        return response()->json($deliveries);
     }
 
     public function partnerMine(Request $request): JsonResponse
     {
         $partner = DB::table('partners')->where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('subscription_status', 'active')->firstOrFail();
-        $deliveries = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where(function ($query) use ($partner) { $query->where('orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.warehouse_id', $partner->id); })->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.claimed_at', 'deliveries.completed_at', DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.last_latitude END as last_latitude"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.last_longitude END as last_longitude"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.location_accuracy_meters END as location_accuracy_meters"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.location_updated_at END as location_updated_at"), 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->latest('deliveries.created_at')->paginate(min($request->integer('per_page', 30), 100));
+        $sortBy = match ($request->string('sort_by')->toString()) { 'public_id' => 'deliveries.public_id', 'related_order' => 'order_public_id', 'delivery_address_snapshot' => 'delivery_address_snapshot', 'scheduled_for' => 'deliveries.scheduled_for', 'status' => 'deliveries.status', 'job_price' => 'job_price', 'total' => 'total', default => 'deliveries.created_at' };
+        $direction = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
+        $deliveries = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where(function ($query) use ($partner) { $query->where('orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.pharmacy_id', $partner->id)->orWhere('procurement_orders.warehouse_id', $partner->id); })->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('deliveries.public_id', 'like', $like)->orWhere('orders.public_id', 'like', $like)->orWhere('procurement_orders.public_id', 'like', $like)->orWhere('deliveries.status', 'like', $like)->orWhere('orders.delivery_address_snapshot', 'like', $like)->orWhere('procurement_orders.delivery_address_snapshot', 'like', $like)); })->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('deliveries.status', $request->string('status')->toString()))->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.scheduled_for', 'deliveries.driver_id', 'deliveries.created_at', 'deliveries.claimed_at', 'deliveries.completed_at', DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.last_latitude END as last_latitude"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.last_longitude END as last_longitude"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.location_accuracy_meters END as location_accuracy_meters"), DB::raw("CASE WHEN deliveries.status IN ('claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived') THEN deliveries.location_updated_at END as location_updated_at"), 'orders.public_id as order_public_id', 'procurement_orders.public_id as procurement_public_id', DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.delivery_fee, procurement_orders.delivery_fee) as job_price'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->orderBy($sortBy, $direction)->orderBy('deliveries.id', $direction)->paginate(min($request->integer('per_page', 30), 100));
         $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
         $deliveries->getCollection()->transform(function ($delivery) use ($locationFreshAfter) {
             if (! $delivery->location_updated_at || strtotime((string) $delivery->location_updated_at) < $locationFreshAfter->timestamp) {
@@ -99,24 +136,31 @@ class DeliveryController extends Controller
         return response()->json($deliveries);
     }
 
-    public function available(Request $request): JsonResponse
+    public function available(Request $request, DeliveryPricingService $pricing): JsonResponse
     {
         abort_unless($request->user()->role === 'driver', 403);
         $driver = DB::table('drivers')->where('user_id', $request->user()->id)->firstOrFail();
         abort_unless($driver->approval_status === 'approved' && $driver->is_available, 403, 'Driver availability must be enabled before viewing new jobs.');
-        $deliveries = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.status', 'available')->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))->latest('deliveries.created_at')->paginate(20);
+        $direction = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
+        $sortBy = match ($request->string('sort_by')->toString()) { 'public_id' => 'deliveries.public_id', 'related_order' => 'order_public_id', 'delivery_address_snapshot' => 'delivery_address_snapshot', 'scheduled_for' => 'deliveries.scheduled_for', 'status' => 'deliveries.status', 'job_price' => 'job_price', 'total' => 'total', default => 'deliveries.created_at' };
+        $vehicleType = $pricing->normalizeVehicleType($driver->vehicle_type);
+        $deliveries = DB::table('deliveries')->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')->where('deliveries.status', 'available')->whereRaw("LOWER(COALESCE(orders.delivery_vehicle_type, procurement_orders.delivery_vehicle_type, 'motorcycle')) = ?", [$vehicleType])->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('deliveries.public_id', 'like', $like)->orWhere('orders.public_id', 'like', $like)->orWhere('procurement_orders.public_id', 'like', $like)->orWhere('orders.delivery_address_snapshot', 'like', $like)->orWhere('procurement_orders.delivery_address_snapshot', 'like', $like)); })->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.scheduled_for', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'), DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.delivery_fee, procurement_orders.delivery_fee) as job_price'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'), DB::raw("COALESCE(orders.delivery_vehicle_type, procurement_orders.delivery_vehicle_type, 'motorcycle') as delivery_vehicle_type"))->orderBy($sortBy, $direction)->orderBy('deliveries.id', $direction)->paginate(min($request->integer('per_page', 20), 100));
         return response()->json($deliveries);
     }
 
-    public function claim(Request $request, int $delivery): JsonResponse
+    public function claim(Request $request, int $delivery, DeliveryPricingService $pricing): JsonResponse
     {
         abort_unless($request->user()->role === 'driver', 403);
         $driver = DB::table('drivers')->where('user_id', $request->user()->id)->where('approval_status', 'approved')->where('is_available', true)->firstOrFail();
-        $claimed = DatabaseTransaction::run(function () use ($delivery, $driver) {
+        $claimed = DatabaseTransaction::run(function () use ($delivery, $driver, $pricing) {
             $lockedDriver = DB::table('drivers')->where('id', $driver->id)->lockForUpdate()->firstOrFail();
             abort_unless($lockedDriver->approval_status === 'approved' && $lockedDriver->is_available, 403, 'Driver availability must be enabled before claiming a delivery.');
             $row = DB::table('deliveries')->where('id', $delivery)->lockForUpdate()->firstOrFail();
             if ($row->status !== 'available') abort(409, 'This delivery has already been claimed.');
+            $vehicleType = $row->order_id
+                ? DB::table('orders')->where('id', $row->order_id)->value('delivery_vehicle_type')
+                : DB::table('procurement_orders')->where('id', $row->procurement_order_id)->value('delivery_vehicle_type');
+            abort_unless($pricing->normalizeVehicleType($lockedDriver->vehicle_type) === $pricing->normalizeVehicleType($vehicleType), 403, 'This job requires a different vehicle type.');
             DB::table('deliveries')->where('id', $delivery)->update(['driver_id' => $lockedDriver->id, 'status' => 'claimed', 'claimed_at' => now(), 'updated_at' => now()]);
             DB::table('delivery_events')->insert(['delivery_id' => $delivery, 'actor_id' => $lockedDriver->user_id, 'from_status' => $row->status, 'to_status' => 'claimed', 'created_at' => now(), 'updated_at' => now()]);
             return DB::table('deliveries')->where('id', $delivery)->first();
@@ -127,7 +171,7 @@ class DeliveryController extends Controller
             $recipientId = DB::table('partners')->where('id', $pharmacyId)->value('user_id');
         }
         if ($recipientId) NotificationService::send($recipientId, 'delivery.claimed', ['delivery_id' => $delivery, 'message' => 'A driver has claimed your delivery.']);
-        DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->where('user_id', '!=', $driver->user_id)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.unavailable', ['delivery_id' => $delivery, 'message' => 'A delivery job was claimed by another driver.']));
+        DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->whereRaw('LOWER(vehicle_type) = ?', [strtolower((string) $driver->vehicle_type)])->where('user_id', '!=', $driver->user_id)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.unavailable', ['delivery_id' => $delivery, 'message' => 'A delivery job was claimed by another driver.']));
         AuditService::record($request, 'delivery.claimed', 'delivery', $delivery, ['driver_id' => $driver->id]);
         return response()->json(['delivery' => $claimed]);
     }
@@ -200,7 +244,7 @@ class DeliveryController extends Controller
         return response()->json(['delivery' => $updated]);
     }
 
-    public function complete(Request $request, int $delivery): JsonResponse
+    public function complete(Request $request, int $delivery, ProcurementBatchService $batches): JsonResponse
     {
         abort_unless($request->user()->role === 'driver', 403);
         $idempotencyKey = trim((string) $request->header('Idempotency-Key'));
@@ -214,7 +258,7 @@ class DeliveryController extends Controller
         }
         $data = $request->validate(['pin' => ['required', 'digits:6']]);
         $driver = DB::table('drivers')->where('user_id', $request->user()->id)->where('approval_status', 'approved')->firstOrFail();
-        $result = DatabaseTransaction::run(function () use ($delivery, $driver, $data) {
+        $result = DatabaseTransaction::run(function () use ($delivery, $driver, $data, $batches) {
             $row = DB::table('deliveries')->where('id', $delivery)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
             if ($row->status === 'delivered' || $row->pin_used_at) abort(409, 'Delivery is already completed.');
             if ($row->status !== 'arrived') abort(409, 'Delivery must be marked arrived before PIN confirmation.');
@@ -228,7 +272,7 @@ class DeliveryController extends Controller
             if ($row->order_id) {
                 $this->finalizePatientOrderStock($row->order_id, $driver->user_id);
             } elseif ($row->procurement_order_id) {
-                $this->finalizeProcurementStock($row->procurement_order_id, $driver->user_id);
+                $this->finalizeProcurementStock($row->procurement_order_id, $driver->user_id, $batches);
             }
             DB::table('deliveries')->where('id', $delivery)->update(['status' => 'delivered', 'pin_used_at' => now(), 'completed_at' => now(), 'last_latitude' => null, 'last_longitude' => null, 'location_accuracy_meters' => null, 'location_updated_at' => null, 'updated_at' => now()]);
             DB::table('delivery_events')->insert(['delivery_id' => $delivery, 'actor_id' => $driver->user_id, 'from_status' => $row->status, 'to_status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
@@ -269,18 +313,17 @@ class DeliveryController extends Controller
         }
     }
 
-    private function finalizeProcurementStock(int $procurementId, int $actorId): void
+    private function finalizeProcurementStock(int $procurementId, int $actorId, ProcurementBatchService $batches): void
     {
         $order = DB::table('procurement_orders')->where('id', $procurementId)->lockForUpdate()->firstOrFail();
         $items = DB::table('procurement_order_items')->where('procurement_order_id', $procurementId)->lockForUpdate()->get();
         foreach ($items as $item) {
             $quantity = (int) $item->accepted_quantity;
             if ($quantity <= 0) continue;
-            $source = DB::table('inventories')->where('owner_type', 'warehouse')->where('owner_id', $order->warehouse_id)->where('medicine_id', $item->medicine_id)->lockForUpdate()->firstOrFail();
-            abort_unless($source->quantity >= $quantity && $source->reserved_quantity >= $quantity, 409, 'Reserved warehouse stock is no longer consistent.');
-            $sourceAfter = $source->quantity - $quantity;
-            DB::table('inventories')->where('id', $source->id)->update(['quantity' => $sourceAfter, 'reserved_quantity' => $source->reserved_quantity - $quantity, 'updated_at' => now()]);
-            DB::table('inventory_movements')->insert(['medicine_id' => $item->medicine_id, 'owner_type' => 'warehouse', 'owner_id' => $order->warehouse_id, 'order_id' => null, 'type' => 'procurement_delivery_out', 'quantity_delta' => -$quantity, 'quantity_after' => $sourceAfter, 'reason' => 'Procurement delivery completed: ' . $order->public_id, 'created_by' => $actorId, 'created_at' => now(), 'updated_at' => now()]);
+            $consumedBatches = $batches->consumeReservations((int) $item->id);
+            foreach ($consumedBatches as $consumedBatch) {
+                DB::table('inventory_movements')->insert(['medicine_id' => $item->medicine_id, 'owner_type' => 'warehouse', 'owner_id' => $order->warehouse_id, 'order_id' => null, 'type' => 'procurement_delivery_out', 'quantity_delta' => -$consumedBatch->quantity, 'quantity_after' => $consumedBatch->quantity_after, 'reason' => 'Procurement delivery completed from batch ' . ($consumedBatch->batch_number ?: '#'.$consumedBatch->inventory_id) . ': ' . $order->public_id, 'created_by' => $actorId, 'created_at' => now(), 'updated_at' => now()]);
+            }
             $destination = DB::table('inventories')->where('owner_type', 'pharmacy')->where('owner_id', $order->pharmacy_id)->where('medicine_id', $item->medicine_id)->lockForUpdate()->first();
             if ($destination) {
                 $destinationAfter = $destination->quantity + $quantity;

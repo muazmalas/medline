@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Order;
+use App\Models\Medicine;
 use App\Models\Partner;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -21,6 +23,29 @@ class AuthorizationBoundaryTest extends TestCase
         $this->actingAs($patient)
             ->getJson('/api/v1/admin/dashboard')
             ->assertForbidden();
+    }
+
+    public function test_two_factor_enabled_administrator_cannot_sign_in_without_authenticator_code(): void
+    {
+        $administrator = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+            'password' => 'password123',
+            'two_factor_enabled' => true,
+            'two_factor_secret' => Crypt::encryptString('JBSWY3DPEHPK3PXP'),
+            'two_factor_confirmed_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => $administrator->email,
+            'password' => 'password123',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 'AUTH_TWO_FACTOR_REQUIRED');
+
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $administrator->id,
+        ]);
     }
 
     public function test_pharmacy_cannot_access_administrator_user_directory(): void
@@ -39,6 +64,88 @@ class AuthorizationBoundaryTest extends TestCase
         $this->actingAs($patient)
             ->getJson('/api/v1/partner/inventory')
             ->assertForbidden();
+    }
+
+    public function test_driver_cannot_access_partner_inventory_even_with_a_direct_api_link(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+
+        $this->actingAs($driver)
+            ->getJson('/api/v1/partner/inventory')
+            ->assertForbidden();
+
+        $this->actingAs($driver)
+            ->getJson('/api/v1/admin/inventory')
+            ->assertForbidden();
+    }
+
+    public function test_only_administrators_create_medicines_and_warehouses_stock_active_catalog_items_immediately(): void
+    {
+        $administrator = User::factory()->create(['role' => 'admin']);
+        $warehouseUser = User::factory()->create(['role' => 'warehouse', 'status' => 'active']);
+        $warehouse = Partner::create([
+            'user_id' => $warehouseUser->id,
+            'type' => 'warehouse',
+            'business_name' => 'Catalog Stock Warehouse',
+            'approval_status' => 'approved',
+            'subscription_status' => 'active',
+        ]);
+
+        $this->actingAs($warehouseUser)
+            ->postJson('/api/v1/medicines', [
+                'name_en' => 'Unauthorized New Medicine',
+                'name_ar' => 'Unauthorized New Medicine',
+            ], ['Idempotency-Key' => 'warehouse-create-medicine'])
+            ->assertForbidden();
+
+        $activeMedicine = $this->actingAs($administrator)
+            ->postJson('/api/v1/medicines', [
+                'name_en' => 'Administrator Catalog Medicine',
+                'name_ar' => 'Administrator Catalog Medicine',
+                'code' => 'ADMIN-CATALOG-001',
+                'is_active' => true,
+            ], ['Idempotency-Key' => 'admin-create-medicine'])
+            ->assertCreated()
+            ->json('medicine');
+        $inactiveMedicine = Medicine::create([
+            'name_en' => 'Inactive Catalog Medicine',
+            'name_ar' => 'Inactive Catalog Medicine',
+            'code' => 'INACTIVE-CATALOG-001',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($warehouseUser)
+            ->putJson('/api/v1/partner/inventory', [
+                'medicine_id' => $activeMedicine['id'],
+                'quantity' => 120,
+                'unit_price' => 1850,
+                'low_stock_threshold' => 15,
+            ], ['Idempotency-Key' => 'warehouse-stock-active-medicine'])
+            ->assertCreated()
+            ->assertJsonPath('inventory.quantity', 120);
+
+        $this->assertDatabaseHas('inventories', [
+            'owner_type' => 'warehouse',
+            'owner_id' => $warehouse->id,
+            'medicine_id' => $activeMedicine['id'],
+            'quantity' => 120,
+        ]);
+        $this->actingAs($warehouseUser)
+            ->getJson('/api/v1/partner/inventory')
+            ->assertOk()
+            ->assertJsonPath('data.0.name_en', 'Administrator Catalog Medicine');
+        $this->getJson('/api/v1/medicines?partner_id='.$warehouse->id.'&inventory_type=warehouse&available_only=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.available_quantity', 120);
+
+        $this->actingAs($warehouseUser)
+            ->putJson('/api/v1/partner/inventory', [
+                'medicine_id' => $inactiveMedicine->id,
+                'quantity' => 10,
+                'unit_price' => 500,
+            ], ['Idempotency-Key' => 'warehouse-stock-inactive-medicine'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('medicine_id');
     }
 
     public function test_patient_cannot_view_another_patients_order(): void

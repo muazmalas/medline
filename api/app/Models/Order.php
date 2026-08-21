@@ -12,8 +12,10 @@ class Order extends Model
 
     protected $fillable = [
         'public_id', 'patient_id', 'pharmacy_id', 'address_id', 'status',
-        'payment_method', 'payment_status', 'subtotal', 'delivery_fee', 'total',
-        'delivery_address_snapshot', 'patient_note', 'partial_offer_note', 'partial_offered_at',
+        'payment_method', 'payment_status', 'subtotal', 'tax_rate', 'tax_amount', 'delivery_fee', 'total',
+        'delivery_pricing_rate_id', 'delivery_distance_km', 'delivery_rate_per_km', 'delivery_vehicle_type',
+        'delivery_latitude', 'delivery_longitude',
+        'delivery_address_snapshot', 'delivery_preference', 'scheduled_delivery_at', 'patient_note', 'partial_offer_note', 'partial_offered_at',
         'patient_decision_note', 'patient_decided_at',
     ];
 
@@ -21,8 +23,15 @@ class Order extends Model
     {
         return [
             'subtotal' => 'decimal:2',
+            'tax_rate' => 'decimal:2',
+            'tax_amount' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
+            'delivery_distance_km' => 'decimal:2',
+            'delivery_rate_per_km' => 'decimal:2',
+            'delivery_latitude' => 'decimal:7',
+            'delivery_longitude' => 'decimal:7',
             'total' => 'decimal:2',
+            'scheduled_delivery_at' => 'datetime',
             'partial_offered_at' => 'datetime',
             'patient_decided_at' => 'datetime',
         ];

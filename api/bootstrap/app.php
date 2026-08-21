@@ -7,6 +7,7 @@ use App\Http\Middleware\AttachRequestId;
 use App\Http\Middleware\ValidateIdempotencyKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\EnforceHttps;
+use App\Http\Middleware\EnsureUserRole;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Debug\ShouldntReport;
@@ -26,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(AttachRequestId::class);
         $middleware->append(EnforceHttps::class);
         $middleware->append(SecurityHeaders::class);
-        $middleware->alias(['idempotency' => ValidateIdempotencyKey::class]);
+        $middleware->alias(['idempotency' => ValidateIdempotencyKey::class, 'role' => EnsureUserRole::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {

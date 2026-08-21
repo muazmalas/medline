@@ -12,6 +12,7 @@ use App\Support\NotificationService;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use App\Support\AuditService;
 use App\Support\DatabaseTransaction;
 
@@ -21,7 +22,7 @@ class OrderWorkflowController extends Controller
     {
         $partner = Partner::where('user_id', $request->user()->id)->where('type', 'pharmacy')->where('approval_status', 'approved')->where('subscription_status', 'active')->first();
         if (! $partner) {
-            return response()->json(['message' => 'Partner profile not found.'], 404);
+            return response()->json(['message' => 'Pharmacy profile not found.'], 404);
         }
 
         $sortable = ['public_id', 'status', 'created_at', 'total', 'delivery_address_snapshot'];
@@ -39,6 +40,7 @@ class OrderWorkflowController extends Controller
             })
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->orderBy($sortBy, $sortDirection)
+            ->orderBy('id', $sortDirection)
             ->paginate(min($request->integer('per_page', 20), 50));
         $orders->getCollection()->transform(function ($record) use ($partner) {
             $record->customer_name = DB::table('users')->where('id', $record->patient_id)->value('name');
@@ -64,8 +66,11 @@ class OrderWorkflowController extends Controller
             'items' => ['nullable', 'required_if:decision,partial', 'array'],
             'items.*.id' => ['required', 'integer'],
             'items.*.accepted_quantity' => ['required', 'integer', 'min:0'],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'note' => ['nullable', 'required_if:decision,partial,reject', 'string', 'min:5', 'max:1000'],
         ]);
+        if (in_array($data['decision'], ['partial', 'reject'], true) && mb_strlen(trim((string) ($data['note'] ?? ''))) < 5) {
+            throw ValidationException::withMessages(['note' => ['Explain the partial approval or rejection in at least 5 characters.']]);
+        }
 
         $order = DatabaseTransaction::run(function () use ($data, $order, $request) {
             $partner = Partner::whereKey($order->pharmacy_id)->where('type', 'pharmacy')->where('approval_status', 'approved')->where('subscription_status', 'active')->lockForUpdate()->first();
@@ -83,16 +88,22 @@ class OrderWorkflowController extends Controller
                     $this->releaseReservation($lockedOrder, $item);
                     $item->update(['accepted_quantity' => 0]);
                 }
-                $lockedOrder->update(['status' => 'rejected']);
+                $lockedOrder->update([
+                    'status' => 'rejected',
+                    'partial_offer_note' => trim($data['note']),
+                    'partial_offered_at' => null,
+                ]);
             } else {
                 $requested = collect($data['items'] ?? [])->keyBy('id');
                 $acceptedSubtotal = 0.0;
                 $acceptedUnits = 0;
                 $requestedUnits = (int) $lockedOrder->items->sum('quantity');
                 foreach ($lockedOrder->items as $item) {
-                    $accepted = $data['decision'] === 'accept'
-                        ? $item->quantity
-                        : min($item->quantity, (int) ($requested[$item->id]['accepted_quantity'] ?? 0));
+                    $submittedQuantity = (int) ($requested[$item->id]['accepted_quantity'] ?? 0);
+                    if ($data['decision'] === 'partial' && $submittedQuantity > $item->quantity) {
+                        abort(422, 'A fulfilled quantity cannot be greater than the quantity requested.');
+                    }
+                    $accepted = $data['decision'] === 'accept' ? $item->quantity : $submittedQuantity;
                     $requiresPrescription = (bool) $item->prescription_required_snapshot || (bool) DB::table('medicines')->where('id', $item->medicine_id)->value('prescription_required');
                     if ($accepted > 0 && $requiresPrescription) {
                         $approvedPrescription = DB::table('prescriptions')->where('order_item_id', $item->id)->where('status', 'approved')->exists();
@@ -106,11 +117,13 @@ class OrderWorkflowController extends Controller
                 if ($data['decision'] === 'partial') {
                     abort_unless($acceptedUnits > 0 && $acceptedUnits < $requestedUnits, 422, 'A partial offer must accept at least one item and leave at least one requested unit unaccepted.');
                 }
+                $taxAmount = round($acceptedSubtotal * (float) $lockedOrder->tax_rate / 100, 2);
                 $lockedOrder->update([
                     'status' => $data['decision'] === 'accept' ? 'accepted' : 'partial_approval_required',
                     'subtotal' => $acceptedSubtotal,
-                    'total' => $acceptedSubtotal + (float) $lockedOrder->delivery_fee,
-                    'partial_offer_note' => $data['decision'] === 'partial' ? ($data['note'] ?? null) : null,
+                    'tax_amount' => $taxAmount,
+                    'total' => $acceptedSubtotal + $taxAmount + (float) $lockedOrder->delivery_fee,
+                    'partial_offer_note' => $data['decision'] === 'partial' ? trim($data['note']) : null,
                     'partial_offered_at' => $data['decision'] === 'partial' ? now() : null,
                     'patient_decision_note' => null,
                     'patient_decided_at' => null,
@@ -184,6 +197,7 @@ class OrderWorkflowController extends Controller
             'public_id' => (string) Str::ulid(),
             'order_id' => $order->id,
             'status' => 'available',
+            'scheduled_for' => $order->scheduled_delivery_at,
             'pin_hash' => Hash::make($pin),
             'pin_encrypted' => Crypt::encryptString($pin),
             'created_at' => now(),

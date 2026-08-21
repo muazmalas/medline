@@ -14,6 +14,7 @@ use App\Support\DatabaseTransaction;
 use Illuminate\Support\Facades\Validator;
 use App\Contracts\FileScanner;
 use Illuminate\Support\Facades\URL;
+use App\Services\MedicineSpreadsheetReader;
 
 class MedicineController extends Controller
 {
@@ -31,6 +32,8 @@ class MedicineController extends Controller
         $medicine->available_at = DB::table('inventories')
             ->join('partners', function ($join) { $join->on('partners.id', '=', 'inventories.owner_id')->where('inventories.owner_type', 'pharmacy'); })
             ->where('inventories.medicine_id', $medicine->id)
+            ->where('inventories.is_active', true)
+            ->where(fn ($query) => $query->whereNull('inventories.expires_at')->orWhereDate('inventories.expires_at', '>', today()))
             ->whereColumn('inventories.quantity', '>', 'inventories.reserved_quantity')
             ->where('partners.approval_status', 'approved')
             ->where('partners.subscription_status', 'active')
@@ -44,18 +47,23 @@ class MedicineController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = trim($request->string('search')->toString());
-        $sort = $request->string('sort', 'name_en')->toString();
-        $sortColumn = in_array($sort, ['name_en', 'created_at'], true) ? $sort : 'name_en';
+        $sort = $request->string('sort_by', $request->string('sort', 'name_en')->toString())->toString();
+        $sortColumn = in_array($sort, ['name_en', 'name_ar', 'manufacturer', 'form', 'dosage', 'code', 'prescription_required', 'is_active', 'created_at'], true) ? $sort : 'name_en';
+        $sortDirection = $request->string('sort_direction')->lower()->toString() === 'desc' ? 'desc' : 'asc';
         $partnerId = $request->integer('partner_id');
         $inventoryType = in_array($request->string('inventory_type')->toString(), ['pharmacy', 'warehouse'], true) ? $request->string('inventory_type')->toString() : 'pharmacy';
+        $mayViewInactive = $request->user()?->role === 'admin' && $request->boolean('include_inactive');
 
         $medicines = Medicine::query()
-            ->where('is_active', true)
+            ->select('medicines.*')
+            ->when(! $mayViewInactive, fn ($query) => $query->where('is_active', true))
+            ->when($mayViewInactive && $request->string('status')->toString() === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($mayViewInactive && $request->string('status')->toString() === 'inactive', fn ($query) => $query->where('is_active', false))
             ->when($request->filled('category_id'), fn ($query) => $query->where('category_id', $request->integer('category_id')))
             ->when($request->has('prescription_required'), fn ($query) => $query->where('prescription_required', $request->boolean('prescription_required')))
             ->when($request->boolean('available_only') || $partnerId > 0, function ($query) use ($partnerId, $inventoryType) {
                 $query->whereExists(function ($inventory) use ($partnerId, $inventoryType) {
-                    $inventory->selectRaw('1')->from('inventories')->whereColumn('inventories.medicine_id', 'medicines.id')->where('inventories.owner_type', $inventoryType)->whereColumn('inventories.quantity', '>', 'inventories.reserved_quantity')->when($partnerId > 0, fn ($nested) => $nested->where('inventories.owner_id', $partnerId));
+                    $inventory->selectRaw('1')->from('inventories')->whereColumn('inventories.medicine_id', 'medicines.id')->where('inventories.owner_type', $inventoryType)->where('inventories.is_active', true)->where(fn ($nested) => $nested->whereNull('inventories.expires_at')->orWhereDate('inventories.expires_at', '>', today()))->whereColumn('inventories.quantity', '>', 'inventories.reserved_quantity')->when($partnerId > 0, fn ($nested) => $nested->where('inventories.owner_id', $partnerId));
                 });
             })
             ->when($search !== '', function ($query) use ($search) {
@@ -67,8 +75,28 @@ class MedicineController extends Controller
                         ->orWhere('code', 'like', $like);
                 });
             })
-            ->orderBy($sortColumn)
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderBy('id')
+            ->when($partnerId > 0, function ($query) use ($partnerId, $inventoryType) {
+                $inventory = fn () => DB::table('inventories')
+                    ->whereColumn('inventories.medicine_id', 'medicines.id')
+                    ->where('inventories.owner_type', $inventoryType)
+                    ->where('inventories.owner_id', $partnerId)
+                    ->where('inventories.is_active', true)
+                    ->where(fn ($nested) => $nested->whereNull('inventories.expires_at')->orWhereDate('inventories.expires_at', '>', today()));
+                $query->addSelect([
+                    'unit_price' => $inventory()->selectRaw('MIN(inventories.unit_price)'),
+                    'available_quantity' => $inventory()->selectRaw('SUM(inventories.quantity - inventories.reserved_quantity)'),
+                ]);
+            })
             ->paginate(min($request->integer('per_page', 15), 50));
+
+        if ($partnerId > 0) {
+            $medicines->getCollection()->transform(function ($medicine) {
+                $medicine->available_quantity = $medicine->available_quantity === null ? null : (int) $medicine->available_quantity;
+                return $medicine;
+            });
+        }
 
         $payload = $medicines->toArray();
         if ($search !== '' && count($medicines->items()) === 0) {
@@ -155,43 +183,55 @@ class MedicineController extends Controller
         return response()->json(['message' => 'Medicine updated.', 'medicine' => $medicine->fresh()]);
     }
 
-    public function destroy(Request $request, Medicine $medicine): JsonResponse
+    public function updateStatus(Request $request, Medicine $medicine): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $medicine->update(['is_active' => false]);
-        AuditService::record($request, 'medicine.deactivated', Medicine::class, $medicine->id);
-        return response()->json(['message' => 'Medicine deactivated.']);
+        $data = $request->validate(['is_active' => ['required', 'boolean']]);
+        $medicine->update(['is_active' => $data['is_active']]);
+        AuditService::record($request, $data['is_active'] ? 'medicine.activated' : 'medicine.deactivated', Medicine::class, $medicine->id);
+        return response()->json(['message' => $data['is_active'] ? 'Medicine activated.' : 'Medicine deactivated.', 'medicine' => $medicine->fresh()]);
     }
 
-    public function import(Request $request, FileScanner $scanner): JsonResponse
+    public function import(Request $request, FileScanner $scanner, MedicineSpreadsheetReader $reader): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $data = $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:5120']]);
+        $data = $request->validate(['file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120']]);
         $scanner->scan($data['file']);
-        $handle = fopen($data['file']->getRealPath(), 'rb');
-        $headers = array_map(fn ($value) => trim((string) $value), fgetcsv($handle) ?: []);
+        $spreadsheet = $reader->read($data['file']);
+        $headers = array_map(fn ($value) => mb_strtolower(trim((string) $value)), $spreadsheet['headers']);
         $required = ['name_en', 'name_ar'];
-        abort_unless($headers !== [] && count(array_diff($required, $headers)) === 0, 422, 'CSV must contain name_en and name_ar columns.');
-        $rows = []; $line = 1; $errors = [];
-        while (($values = fgetcsv($handle)) !== false) {
-            $line++;
+        abort_unless($headers !== [] && count(array_diff($required, $headers)) === 0, 422, 'The spreadsheet must contain name_en and name_ar columns.');
+        $rows = []; $errors = [];
+        foreach ($spreadsheet['rows'] as $line => $values) {
             if (count(array_filter($values, fn ($value) => trim((string) $value) !== '')) === 0) continue;
-            $row = array_combine($headers, array_pad($values, count($headers), null));
-            $validator = Validator::make($row, ['name_en' => ['required', 'string', 'max:180'], 'name_ar' => ['required', 'string', 'max:180'], 'manufacturer' => ['nullable', 'string', 'max:180'], 'form' => ['nullable', 'string', 'max:80'], 'dosage' => ['nullable', 'string', 'max:80'], 'code' => ['nullable', 'string', 'max:100'], 'category_id' => ['nullable', 'integer', 'exists:medicine_categories,id'], 'prescription_required' => ['nullable', 'boolean']]);
+            $row = array_combine($headers, array_slice(array_pad($values, count($headers), null), 0, count($headers)));
+            foreach (['prescription_required', 'is_active'] as $booleanField) {
+                if (! array_key_exists($booleanField, $row) || $row[$booleanField] === null || $row[$booleanField] === '') continue;
+                $normalized = mb_strtolower(trim((string) $row[$booleanField]));
+                $row[$booleanField] = in_array($normalized, ['1', 'true', 'yes', 'y'], true) ? 1 : (in_array($normalized, ['0', 'false', 'no', 'n'], true) ? 0 : $row[$booleanField]);
+            }
+            $validator = Validator::make($row, ['name_en' => ['required', 'string', 'max:180'], 'name_ar' => ['required', 'string', 'max:180'], 'manufacturer' => ['nullable', 'string', 'max:180'], 'active_ingredient' => ['nullable', 'string', 'max:255'], 'form' => ['nullable', 'string', 'max:80'], 'dosage' => ['nullable', 'string', 'max:80'], 'pack_size' => ['nullable', 'string', 'max:100'], 'administration_route' => ['nullable', 'string', 'max:80'], 'code' => ['nullable', 'string', 'max:100'], 'category_id' => ['nullable', 'integer', 'exists:medicine_categories,id'], 'prescription_required' => ['nullable', 'boolean'], 'is_active' => ['nullable', 'boolean']]);
             if ($validator->fails()) { $errors[$line] = $validator->errors()->toArray(); continue; }
             $rows[] = $validator->validated();
         }
-        fclose($handle);
-        abort_unless($errors === [], 422, 'CSV validation failed: ' . json_encode($errors, JSON_THROW_ON_ERROR));
+        abort_unless($errors === [], 422, 'Spreadsheet validation failed: ' . json_encode($errors, JSON_THROW_ON_ERROR));
+        abort_unless($rows !== [], 422, 'The spreadsheet does not contain any medicine records.');
         DatabaseTransaction::run(function () use ($rows) {
             foreach ($rows as $row) {
                 $code = trim((string) ($row['code'] ?? ''));
-                if ($code !== '') Medicine::updateOrCreate(['code' => $code], array_merge($row, ['is_active' => true]));
-                else Medicine::create(array_merge($row, ['is_active' => true]));
+                if ($code !== '') Medicine::updateOrCreate(['code' => $code], array_merge(['is_active' => true], $row));
+                else Medicine::create(array_merge(['is_active' => true], $row));
             }
         });
         AuditService::record($request, 'medicine.imported', 'medicine_catalog', null, ['rows' => count($rows)]);
-        return response()->json(['message' => 'Medicine catalog imported.', 'rows' => count($rows)]);
+        return response()->json(['message' => count($rows) . ' medicines imported successfully.', 'rows' => count($rows)]);
+    }
+
+    public function importTemplate(Request $request)
+    {
+        abort_unless($request->user()->role === 'admin', 403);
+        $headers = ['code', 'name_en', 'name_ar', 'manufacturer', 'active_ingredient', 'form', 'dosage', 'pack_size', 'administration_route', 'category_id', 'prescription_required', 'is_active'];
+        return response()->streamDownload(function () use ($headers) { $output = fopen('php://output', 'wb'); fputcsv($output, $headers); fputcsv($output, ['MED-EXAMPLE-100', 'Example medicine 100mg', 'دواء تجريبي 100 ملغ', 'Example Labs', 'Example ingredient', 'Tablets', '100mg', '20 tablets', 'Oral', '', 'no', 'yes']); fclose($output); }, 'medline-medicine-import-template.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function export(Request $request)

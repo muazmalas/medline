@@ -32,7 +32,7 @@ class AdminController extends Controller
                 ['key' => 'low_stock', 'severity' => 'warning', 'count' => DB::table('inventories')->whereColumn('quantity', '<=', 'low_stock_threshold')->count(), 'message' => 'Inventory records are at or below their low-stock threshold.'],
                 ['key' => 'failed_deliveries', 'severity' => 'critical', 'count' => DB::table('deliveries')->where('status', 'failed')->count(), 'message' => 'Failed deliveries require reassignment or support review.'],
                 ['key' => 'open_complaints', 'severity' => 'warning', 'count' => DB::table('complaints')->whereIn('status', ['open', 'in_review'])->count(), 'message' => 'Customer complaints are awaiting support action.'],
-                ['key' => 'pending_partners', 'severity' => 'info', 'count' => Partner::where('approval_status', 'pending')->count(), 'message' => 'Partner applications are awaiting administrator review.'],
+                ['key' => 'pending_partners', 'severity' => 'info', 'count' => Partner::where('approval_status', 'pending')->count(), 'message' => 'Pharmacy and warehouse applications are awaiting administrator review.'],
             ],
         ]);
     }
@@ -40,12 +40,25 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
+        $sortColumns = [
+            'name' => 'users.name',
+            'email' => 'users.email',
+            'company' => 'partners.business_name',
+            'role' => 'users.role',
+            'status' => 'users.status',
+            'created_at' => 'users.created_at',
+        ];
+        $sortBy = $request->string('sort_by')->toString();
+        $sortColumn = $sortColumns[$sortBy] ?? 'users.created_at';
+        $sortDirection = $request->string('sort_direction')->lower()->toString() === 'asc' ? 'asc' : 'desc';
         $users = User::query()
             ->leftJoin('partners', 'partners.user_id', '=', 'users.id')
             ->select('users.*', 'partners.business_name as company_name', 'partners.type as company_type')
-            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('users.name', 'like', $like)->orWhere('users.email', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })
+            ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('users.name', 'like', $like)->orWhere('users.email', 'like', $like)->orWhere('users.role', 'like', $like)->orWhere('users.status', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('users.status', $request->string('status')->toString()))
-            ->latest('users.created_at')
+            ->when($request->string('role')->isNotEmpty(), fn ($query) => $query->where('users.role', $request->string('role')->toString()))
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderByDesc('users.id')
             ->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($users);
     }
@@ -75,11 +88,22 @@ class AdminController extends Controller
             $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $locked->update(['status' => $data['status']]);
             if ($locked->role === 'driver') {
-                DB::table('drivers')->where('user_id', $locked->id)->update([
-                    'approval_status' => $data['status'] === 'active' ? 'approved' : 'rejected',
-                    'is_available' => false,
-                    'updated_at' => now(),
-                ]);
+                $driver = DB::table('drivers')->where('user_id', $locked->id)->lockForUpdate()->first();
+                if ($driver) {
+                    $approvalStatus = $driver->approval_status;
+                    if ($data['status'] === 'suspended' && $approvalStatus === 'approved') $approvalStatus = 'suspended';
+                    if ($data['status'] === 'active' && $approvalStatus === 'suspended') $approvalStatus = 'approved';
+                    DB::table('drivers')->where('id', $driver->id)->update(['approval_status' => $approvalStatus, 'is_available' => false, 'updated_at' => now()]);
+                }
+            }
+            if (in_array($locked->role, ['pharmacy', 'warehouse'], true)) {
+                $partner = DB::table('partners')->where('user_id', $locked->id)->lockForUpdate()->first();
+                if ($partner && $data['status'] === 'suspended' && $partner->approval_status === 'approved') {
+                    DB::table('partners')->where('id', $partner->id)->update(['approval_status' => 'suspended', 'updated_at' => now()]);
+                }
+                if ($partner && $data['status'] === 'active' && $partner->approval_status === 'suspended') {
+                    DB::table('partners')->where('id', $partner->id)->update(['approval_status' => 'approved', 'updated_at' => now()]);
+                }
             }
             if ($data['status'] === 'suspended') {
                 $locked->tokens()->delete();
@@ -100,9 +124,9 @@ class AdminController extends Controller
             $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $existingPartner = DB::table('partners')->where('user_id', $locked->id)->first();
             $existingDriver = DB::table('drivers')->where('user_id', $locked->id)->exists();
-            if ($existingPartner && $data['role'] !== $existingPartner->type) abort(422, 'Offboard or reassign the existing partner profile before changing this role.');
+            if ($existingPartner && $data['role'] !== $existingPartner->type) abort(422, 'Deactivate or reassign the existing pharmacy or warehouse profile before changing this role.');
             if ($existingDriver && $data['role'] !== 'driver') abort(422, 'Offboard the existing driver profile before changing this role.');
-            if (in_array($data['role'], ['pharmacy', 'warehouse'], true)) abort_unless(DB::table('partners')->where('user_id', $locked->id)->where('type', $data['role'])->exists(), 422, 'The user must have a matching partner profile before this role is assigned.');
+            if (in_array($data['role'], ['pharmacy', 'warehouse'], true)) abort_unless(DB::table('partners')->where('user_id', $locked->id)->where('type', $data['role'])->exists(), 422, 'The user must have a matching pharmacy or warehouse profile before this role is assigned.');
             if ($data['role'] === 'driver') abort_unless(DB::table('drivers')->where('user_id', $locked->id)->exists(), 422, 'The user must have a driver profile before this role is assigned.');
             $oldRole = $locked->role;
             $locked->update(['role' => $data['role']]);
@@ -115,6 +139,17 @@ class AdminController extends Controller
     public function partners(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
+        $sortColumns = [
+            'business_name' => 'business_name',
+            'license_number' => 'license_number',
+            'type' => 'type',
+            'approval_status' => 'approval_status',
+            'subscription_status' => 'subscription_status',
+            'created_at' => 'created_at',
+        ];
+        $sortBy = $request->string('sort_by')->toString();
+        $sortColumn = $sortColumns[$sortBy] ?? 'created_at';
+        $sortDirection = $request->string('sort_direction')->lower()->toString() === 'asc' ? 'asc' : 'desc';
         $partners = Partner::query()
             ->when($request->string('type')->isNotEmpty(), fn ($query) => $query->where('type', $request->string('type')->toString()))
             ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('approval_status', $request->string('status')->toString()))
@@ -123,11 +158,13 @@ class AdminController extends Controller
                 $query->where(function ($nested) use ($like) {
                     $nested->where('business_name', 'like', $like)
                         ->orWhere('license_number', 'like', $like)
+                        ->orWhere('address', 'like', $like)
                         ->orWhere('type', 'like', $like)
                         ->orWhere('approval_status', 'like', $like);
                 });
             })
-            ->latest()
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderByDesc('id')
             ->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($partners);
     }
@@ -168,14 +205,20 @@ class AdminController extends Controller
     public function procurements(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $rows = DB::table('procurement_orders')->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')->select('procurement_orders.*', 'pharmacies.business_name as pharmacy_name', 'warehouses.business_name as warehouse_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('procurement_orders.public_id', 'like', $like)->orWhere('pharmacies.business_name', 'like', $like)->orWhere('warehouses.business_name', 'like', $like)->orWhere('procurement_orders.status', 'like', $like)); })->latest('procurement_orders.created_at')->paginate(min($request->integer('per_page', 30), 100));
+        $sortable = ['public_id' => 'procurement_orders.public_id', 'pharmacy_name' => 'pharmacies.business_name', 'warehouse_name' => 'warehouses.business_name', 'subtotal' => 'procurement_orders.subtotal', 'delivery_fee' => 'procurement_orders.delivery_fee', 'total' => 'procurement_orders.total', 'status' => 'procurement_orders.status', 'created_at' => 'procurement_orders.created_at'];
+        $sortBy = $sortable[$request->string('sort_by')->toString()] ?? 'procurement_orders.created_at';
+        $direction = $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc';
+        $rows = DB::table('procurement_orders')->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')->select('procurement_orders.*', 'pharmacies.business_name as pharmacy_name', 'warehouses.business_name as warehouse_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('procurement_orders.public_id', 'like', $like)->orWhere('pharmacies.business_name', 'like', $like)->orWhere('warehouses.business_name', 'like', $like)->orWhere('procurement_orders.status', 'like', $like)); })->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('procurement_orders.status', $request->string('status')->toString()))->orderBy($sortBy, $direction)->orderBy('procurement_orders.id', $direction)->paginate(min($request->integer('per_page', 30), 100));
         return response()->json($rows);
     }
 
     public function inventory(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
-        $rows = DB::table('inventories')->join('medicines', 'medicines.id', '=', 'inventories.medicine_id')->join('partners', function ($join) { $join->on('partners.id', '=', 'inventories.owner_id')->whereColumn('partners.type', 'inventories.owner_type'); })->select('inventories.*', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.prescription_required', 'partners.business_name as owner_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('medicines.name_en', 'like', $like)->orWhere('medicines.manufacturer', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })->orderBy('medicines.name_en')->paginate(min($request->integer('per_page', 50), 100));
+        $sortable = ['name_en' => 'medicines.name_en', 'owner_name' => 'partners.business_name', 'available_quantity' => DB::raw('(inventories.quantity - inventories.reserved_quantity)'), 'quantity' => 'inventories.quantity', 'reserved_quantity' => 'inventories.reserved_quantity', 'unit_price' => 'inventories.unit_price', 'stock_health' => DB::raw('(inventories.quantity - inventories.reserved_quantity - inventories.low_stock_threshold)'), 'created_at' => 'inventories.created_at', 'updated_at' => 'inventories.updated_at'];
+        $sortBy = $sortable[$request->string('sort_by')->toString()] ?? 'medicines.name_en';
+        $direction = $request->string('sort_direction')->toString() === 'desc' ? 'desc' : 'asc';
+        $rows = DB::table('inventories')->join('medicines', 'medicines.id', '=', 'inventories.medicine_id')->join('partners', function ($join) { $join->on('partners.id', '=', 'inventories.owner_id')->whereColumn('partners.type', 'inventories.owner_type'); })->select('inventories.*', 'medicines.name_en', 'medicines.name_ar', 'medicines.manufacturer', 'medicines.prescription_required', 'partners.business_name as owner_name')->when($request->string('search')->isNotEmpty(), function ($query) use ($request) { $like = '%' . $request->string('search')->toString() . '%'; $query->where(fn ($nested) => $nested->where('medicines.name_en', 'like', $like)->orWhere('medicines.manufacturer', 'like', $like)->orWhere('partners.business_name', 'like', $like)); })->when($request->string('status')->toString() === 'low_stock', fn ($query) => $query->whereRaw('(inventories.quantity - inventories.reserved_quantity) <= inventories.low_stock_threshold'))->when($request->string('status')->toString() === 'healthy', fn ($query) => $query->whereRaw('(inventories.quantity - inventories.reserved_quantity) > inventories.low_stock_threshold'))->orderBy($sortBy, $direction)->orderBy('inventories.id', $direction)->paginate(min($request->integer('per_page', 50), 100));
         return response()->json($rows);
     }
 
@@ -185,14 +228,16 @@ class AdminController extends Controller
         $deliveries = DB::table('deliveries')
             ->leftJoin('orders', 'orders.id', '=', 'deliveries.order_id')
             ->leftJoin('procurement_orders', 'procurement_orders.id', '=', 'deliveries.procurement_order_id')
-            ->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.driver_id', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'), DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'))
+            ->select('deliveries.id', 'deliveries.public_id', 'deliveries.status', 'deliveries.scheduled_for', 'deliveries.driver_id', 'deliveries.created_at', DB::raw('COALESCE(orders.public_id, procurement_orders.public_id) as order_public_id'), DB::raw('COALESCE(orders.delivery_address_snapshot, procurement_orders.delivery_address_snapshot) as delivery_address_snapshot'), DB::raw('COALESCE(orders.delivery_fee, procurement_orders.delivery_fee) as job_price'), DB::raw('COALESCE(orders.total, procurement_orders.total) as total'))
             ->when($request->string('search')->isNotEmpty(), function ($query) use ($request) {
                 $like = '%' . $request->string('search')->toString() . '%';
                 $query->where(function ($nested) use ($like) {
                     $nested->where('deliveries.public_id', 'like', $like)->orWhere('orders.public_id', 'like', $like)->orWhere('procurement_orders.public_id', 'like', $like)->orWhere('deliveries.status', 'like', $like);
                 });
             })
-            ->latest('deliveries.created_at')
+            ->when($request->string('status')->isNotEmpty(), fn ($query) => $query->where('deliveries.status', $request->string('status')->toString()))
+            ->orderBy(match ($request->string('sort_by')->toString()) { 'public_id' => 'deliveries.public_id', 'related_order' => 'order_public_id', 'delivery_address_snapshot' => 'delivery_address_snapshot', 'scheduled_for' => 'deliveries.scheduled_for', 'status' => 'deliveries.status', 'job_price' => 'job_price', 'total' => 'total', default => 'deliveries.created_at' }, $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc')
+            ->orderBy('deliveries.id', $request->string('sort_direction')->toString() === 'asc' ? 'asc' : 'desc')
             ->paginate(min($request->integer('per_page', 30), 100));
 
         return response()->json($deliveries);
@@ -235,6 +280,16 @@ class AdminController extends Controller
     public function ratings(Request $request): JsonResponse
     {
         abort_unless($request->user()->role === 'admin', 403);
+        $sortColumns = [
+            'public_id' => 'orders.public_id',
+            'author' => 'users.name',
+            'score' => 'ratings.score',
+            'status' => 'ratings.hidden_at',
+            'created_at' => 'ratings.created_at',
+        ];
+        $sortBy = $request->string('sort_by')->toString();
+        $sortColumn = $sortColumns[$sortBy] ?? 'ratings.created_at';
+        $sortDirection = $request->string('sort_direction')->lower()->toString() === 'asc' ? 'asc' : 'desc';
         $ratings = DB::table('ratings')
             ->join('orders', 'orders.id', '=', 'ratings.order_id')
             ->join('users', 'users.id', '=', 'ratings.created_by')
@@ -243,7 +298,10 @@ class AdminController extends Controller
                 $like = '%' . $request->string('search')->toString() . '%';
                 $query->where(function ($nested) use ($like) { $nested->where('ratings.comment', 'like', $like)->orWhere('users.name', 'like', $like)->orWhere('orders.public_id', 'like', $like); });
             })
-            ->latest('ratings.created_at')
+            ->when($request->string('status')->toString() === 'visible', fn ($query) => $query->whereNull('ratings.hidden_at'))
+            ->when($request->string('status')->toString() === 'hidden', fn ($query) => $query->whereNotNull('ratings.hidden_at'))
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderByDesc('ratings.id')
             ->paginate(min($request->integer('per_page', 30), 100));
 
         return response()->json($ratings);
@@ -319,7 +377,7 @@ class AdminController extends Controller
         $status = match ($data['decision']) { 'approve' => 'approved', 'reject' => 'rejected', default => 'correction_required' };
         $partner = DatabaseTransaction::run(function () use ($partner, $status, $data, $request) {
             $locked = Partner::whereKey($partner->id)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($locked->approval_status, ['pending', 'correction_required'], true), 409, 'This partner application has already been finalized.');
+            abort_unless(in_array($locked->approval_status, ['pending', 'correction_required'], true), 409, 'This pharmacy or warehouse application has already been finalized.');
             $locked->update(['approval_status' => $status, 'review_note' => $status === 'correction_required' ? ($data['note'] ?? null) : null]);
             $initialSubscription = DB::table('subscriptions')->where('partner_id', $locked->id)->where('origin', 'registration')->latest('created_at')->lockForUpdate()->first();
             $initialProof = $initialSubscription ? DB::table('payment_proofs')->where('subscription_id', $initialSubscription->id)->latest('created_at')->lockForUpdate()->first() : null;
@@ -340,7 +398,7 @@ class AdminController extends Controller
         };
         NotificationService::send($partner->user_id, 'registration.' . $data['decision'], ['partner_id' => $partner->id, 'status' => $status, 'note' => $data['note'] ?? null, 'message' => $message]);
         AuditService::record($request, 'partner.' . $data['decision'], Partner::class, $partner->id, ['note' => $data['note'] ?? null]);
-        return response()->json(['message' => 'Partner decision saved.', 'partner' => $partner]);
+        return response()->json(['message' => ucfirst($partner->type) . ' decision saved.', 'partner' => $partner]);
     }
 
     public function decidePayment(Request $request, int $subscription): JsonResponse

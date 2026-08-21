@@ -11,9 +11,24 @@ use Illuminate\Validation\Rule;
 
 class MedicineCategoryController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(['data' => MedicineCategory::query()->orderBy('name_en')->get(['id', 'name_en', 'name_ar', 'slug'])]);
+        $search = trim($request->string('search')->toString());
+        $sortBy = in_array($request->string('sort_by')->toString(), ['name_en', 'name_ar', 'slug', 'created_at'], true)
+            ? $request->string('sort_by')->toString()
+            : 'name_en';
+        $direction = $request->string('sort_direction')->toString() === 'desc' ? 'desc' : 'asc';
+        $categories = MedicineCategory::query()
+            ->withCount('medicines')
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.$search.'%';
+                $query->where(fn ($nested) => $nested->where('name_en', 'like', $like)->orWhere('name_ar', 'like', $like)->orWhere('slug', 'like', $like));
+            })
+            ->orderBy($sortBy, $direction)
+            ->orderBy('id', $direction)
+            ->paginate(min($request->integer('per_page', 10), 100));
+
+        return response()->json($categories);
     }
 
     public function store(Request $request): JsonResponse

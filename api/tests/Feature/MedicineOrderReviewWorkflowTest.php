@@ -109,6 +109,41 @@ class MedicineOrderReviewWorkflowTest extends TestCase
 
         $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
             'decision' => 'partial',
+            'note' => 'No quantities were changed.',
+            'items' => [
+                ['id' => $items[$available->id]['id'], 'accepted_quantity' => 2],
+                ['id' => $items[$excluded->id]['id'], 'accepted_quantity' => 2],
+            ],
+        ])->assertUnprocessable();
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'partial',
+            'note' => 'An invalid quantity was submitted.',
+            'items' => [
+                ['id' => $items[$available->id]['id'], 'accepted_quantity' => 3],
+                ['id' => $items[$excluded->id]['id'], 'accepted_quantity' => 0],
+            ],
+        ])->assertUnprocessable()->assertJsonPath('message', 'A fulfilled quantity cannot be greater than the quantity requested.');
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'partial',
+            'items' => [
+                ['id' => $items[$available->id]['id'], 'accepted_quantity' => 2],
+                ['id' => $items[$excluded->id]['id'], 'accepted_quantity' => 0],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors('note');
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'reject',
+        ])->assertUnprocessable()->assertJsonValidationErrors('note');
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'reject',
+            'note' => '     ',
+        ])->assertUnprocessable()->assertJsonValidationErrors('note');
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'partial',
             'note' => 'The second medicine is temporarily unavailable.',
             'items' => [
                 ['id' => $items[$available->id]['id'], 'accepted_quantity' => 2],
@@ -121,6 +156,7 @@ class MedicineOrderReviewWorkflowTest extends TestCase
         $this->assertDatabaseHas('order_items', ['id' => $items[$excluded->id]['id'], 'quantity' => 2, 'accepted_quantity' => 0]);
         $this->assertDatabaseHas('inventories', ['medicine_id' => $available->id, 'reserved_quantity' => 2]);
         $this->assertDatabaseHas('inventories', ['medicine_id' => $excluded->id, 'reserved_quantity' => 0]);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'partial_offer_note' => 'The second medicine is temporarily unavailable.']);
 
         $this->actingAs($patient)->getJson('/api/v1/orders/'.$orderId)
             ->assertOk()
@@ -136,6 +172,30 @@ class MedicineOrderReviewWorkflowTest extends TestCase
 
         $this->assertDatabaseCount('deliveries', 1);
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'status' => 'partially_accepted', 'patient_decision_note' => 'Please deliver the available medicine.']);
+    }
+
+    public function test_pharmacy_rejection_records_the_required_patient_note(): void
+    {
+        [$patient, $pharmacyUser, $pharmacy] = $this->usersAndPharmacy();
+        $medicine = Medicine::create(['name_en' => 'Unavailable Medicine', 'name_ar' => 'Unavailable Medicine', 'code' => 'REJECT-NOTE', 'prescription_required' => false, 'is_active' => true]);
+        $this->stock($pharmacy, $medicine, 5, 700);
+        $created = $this->actingAs($patient)->postJson('/api/v1/orders', [
+            'pharmacy_id' => $pharmacy->id,
+            'delivery_address_snapshot' => 'Pinned patient address',
+            'items' => [['medicine_id' => $medicine->id, 'quantity' => 1]],
+        ])->assertCreated();
+        $orderId = (int) $created->json('order.id');
+
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
+            'decision' => 'reject',
+            'note' => 'This medicine is currently unavailable.',
+        ])->assertOk()->assertJsonPath('order.status', 'rejected');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'status' => 'rejected',
+            'partial_offer_note' => 'This medicine is currently unavailable.',
+        ]);
     }
 
     public function test_authenticated_user_can_change_phone_and_password(): void
@@ -169,6 +229,7 @@ class MedicineOrderReviewWorkflowTest extends TestCase
 
         $this->actingAs($pharmacyUser)->postJson('/api/v1/partner/orders/'.$orderId.'/decision', [
             'decision' => 'partial',
+            'note' => 'Only one unit is currently available.',
             'items' => [['id' => $itemId, 'accepted_quantity' => 1]],
         ])->assertOk();
         $this->actingAs($patient)->postJson('/api/v1/orders/'.$orderId.'/partial-offer/decision', [

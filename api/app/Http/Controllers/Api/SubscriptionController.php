@@ -107,7 +107,7 @@ class SubscriptionController extends Controller
         ]);
         $planCode = $data['plan_code'] ?? 'annual_' . $partner->type;
         $plan = config('medline.subscription_plans.' . $planCode);
-        abort_unless(is_array($plan) && $plan['partner_type'] === $partner->type, 422, 'The selected subscription plan is not available for this partner type.');
+        abort_unless(is_array($plan) && $plan['partner_type'] === $partner->type, 422, 'The selected subscription plan is not available for this pharmacy or warehouse type.');
         if ($plan['amount'] !== null) {
             $submittedAmount = number_format((float) $data['amount'], 2, '.', '');
             $configuredAmount = number_format((float) $plan['amount'], 2, '.', '');

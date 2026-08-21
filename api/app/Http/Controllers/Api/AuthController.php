@@ -138,6 +138,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'two_factor_code' => ['sometimes', 'nullable', 'digits:6'],
             'transport' => ['sometimes', 'in:bearer,cookie'],
         ]);
 
@@ -156,6 +157,20 @@ class AuthController extends Controller
                 'message' => $user->status === 'pending' ? 'Your account is awaiting administrator approval.' : 'This account is not active.',
                 'code' => 'AUTH_ACCOUNT_INACTIVE',
             ], 403);
+        }
+        if ($user->role === 'admin' && $user->two_factor_enabled) {
+            if (empty($data['two_factor_code'])) {
+                return response()->json([
+                    'message' => 'Enter the six-digit authenticator code for this administrator account.',
+                    'code' => 'AUTH_TWO_FACTOR_REQUIRED',
+                ], 422);
+            }
+            if (! $user->two_factor_secret || ! $this->validTotp(Crypt::decryptString($user->two_factor_secret), $data['two_factor_code'])) {
+                return response()->json([
+                    'message' => 'The authenticator code is invalid.',
+                    'code' => 'AUTH_TWO_FACTOR_INVALID',
+                ], 422);
+            }
         }
         [$user, $token, $refreshToken] = DatabaseTransaction::run(function () use ($user) {
             $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
@@ -253,7 +268,11 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $request->user()]);
+        $partner = in_array($request->user()->role, ['pharmacy', 'warehouse'], true)
+            ? Partner::where('user_id', $request->user()->id)->first()
+            : null;
+
+        return response()->json(['user' => $request->user(), 'partner' => $partner]);
     }
 
     public function updateProfile(Request $request): JsonResponse

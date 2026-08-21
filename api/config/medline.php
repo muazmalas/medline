@@ -7,6 +7,13 @@ return [
     'currency' => env('MEDLINE_CURRENCY', 'SYP'),
     'tax_rate' => max(0, (float) env('MEDLINE_TAX_RATE', 0)),
     'delivery_fee' => max(0, (float) env('MEDLINE_DELIVERY_FEE', 2500)),
+    'delivery_fee_per_km' => max(0, (float) env('MEDLINE_DELIVERY_FEE_PER_KM', 100)),
+    'delivery_rates' => [
+        'bicycle' => max(0, (float) env('MEDLINE_BICYCLE_DELIVERY_FEE_PER_KM', 60)),
+        'motorcycle' => max(0, (float) env('MEDLINE_MOTORCYCLE_DELIVERY_FEE_PER_KM', env('MEDLINE_DELIVERY_FEE_PER_KM', 100))),
+        'car' => max(0, (float) env('MEDLINE_CAR_DELIVERY_FEE_PER_KM', 140)),
+        'van' => max(0, (float) env('MEDLINE_VAN_DELIVERY_FEE_PER_KM', 180)),
+    ],
     'subscription_grace_period_days' => max(0, (int) env('MEDLINE_SUBSCRIPTION_GRACE_PERIOD_DAYS', 7)),
     'idempotency_retention_days' => max(1, (int) env('MEDLINE_IDEMPOTENCY_RETENTION_DAYS', 7)),
     'idempotency_in_progress_timeout_seconds' => max(60, (int) env('MEDLINE_IDEMPOTENCY_IN_PROGRESS_TIMEOUT_SECONDS', 900)),

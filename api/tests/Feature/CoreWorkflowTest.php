@@ -24,8 +24,9 @@ class CoreWorkflowTest extends TestCase
         $notificationId = (string) DB::table('notifications')->where('notifiable_id', $patient->id)->value('id');
         $otherNotificationId = (string) DB::table('notifications')->where('notifiable_id', $otherPatient->id)->value('id');
 
-        $this->actingAs($patient)->getJson('/api/v1/notifications')->assertOk()->assertJsonCount(1, 'data');
+        $this->actingAs($patient)->getJson('/api/v1/notifications')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('unread_count', 1);
         $this->actingAs($patient)->postJson('/api/v1/notifications/'.$notificationId.'/read', [], ['Idempotency-Key' => 'test-notification-read'])->assertOk();
+        $this->actingAs($patient)->getJson('/api/v1/notifications')->assertOk()->assertJsonPath('unread_count', 0);
         $this->actingAs($patient)->postJson('/api/v1/notifications/'.$otherNotificationId.'/read', [], ['Idempotency-Key' => 'test-other-notification-read'])->assertNotFound();
         $this->assertNotNull(DB::table('notifications')->where('id', $notificationId)->value('read_at'));
     }
