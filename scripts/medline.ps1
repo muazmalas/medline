@@ -41,8 +41,10 @@ OPTIONS
   --reverb-port PORT           Reverb WebSocket port. Default: 8090.
   --web-port PORT              React/Vite port. Default: 3001.
   --mobile-device DEVICE_ID    Flutter Android device ID to launch.
-  --mobile-api-url URL         API URL passed to Flutter. The default is
-                               http://10.0.2.2:API_PORT/api/v1 for an emulator.
+  --mobile-api-url URL         Override the API URL passed to Flutter. By
+                               default the launcher uses 10.0.2.2 for an
+                               emulator and this computer's LAN IP for a
+                               physical Android device.
 
 EXAMPLES
   # Normal daily startup; initialization is automatic only if required.
@@ -182,7 +184,8 @@ if ($options.MobileDevice -and $options.MobileDevice -notmatch '^[A-Za-z0-9._:-]
     throw 'The mobile device ID contains unsupported characters.'
 }
 
-if (-not $options.MobileApiUrl) {
+$mobileApiUrlWasProvided = -not [string]::IsNullOrWhiteSpace($options.MobileApiUrl)
+if (-not $mobileApiUrlWasProvided) {
     $options.MobileApiUrl = "http://10.0.2.2:$($options.ApiPort)/api/v1"
 }
 
@@ -527,6 +530,27 @@ function Get-AndroidDeviceId {
     return $null
 }
 
+function Get-LanIPv4Address {
+    $configurations = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.NetAdapter.Status -eq 'Up' -and
+            $_.IPv4DefaultGateway -and
+            $_.IPv4Address
+        } |
+        Sort-Object { $_.NetIPv4Interface.InterfaceMetric }
+
+    foreach ($configuration in $configurations) {
+        foreach ($address in @($configuration.IPv4Address)) {
+            $value = [string] $address.IPAddress
+            if ($value -and $value -notlike '127.*' -and $value -notlike '169.254.*') {
+                return $value
+            }
+        }
+    }
+
+    return $null
+}
+
 function Start-MedLineRuntime {
     param(
         [string] $PhpPath,
@@ -595,9 +619,20 @@ function Start-MedLineRuntime {
                 Write-Host '  Create/start an Android emulator, then run:' -ForegroundColor Yellow
                 Write-Host '  .\scripts\medline.ps1 --mobile-device YOUR_DEVICE_ID' -ForegroundColor Yellow
             } else {
+                $effectiveMobileApiUrl = $options.MobileApiUrl
+                $isAndroidEmulator = $deviceId -match '^emulator-'
+                if (-not $mobileApiUrlWasProvided -and -not $isAndroidEmulator) {
+                    $lanAddress = Get-LanIPv4Address
+                    if (-not $lanAddress) {
+                        throw 'A LAN IPv4 address could not be detected for the connected physical phone. Use --mobile-api-url http://YOUR_PC_IP:API_PORT/api/v1.'
+                    }
+                    $effectiveMobileApiUrl = "http://${lanAddress}:$($options.ApiPort)/api/v1"
+                    Write-Info "Physical Android device detected; using $effectiveMobileApiUrl."
+                }
+
                 $flutter = Quote-PowerShellLiteral $FlutterPath
                 $quotedDevice = Quote-PowerShellLiteral $deviceId
-                $quotedApiUrl = Quote-PowerShellLiteral $options.MobileApiUrl
+                $quotedApiUrl = Quote-PowerShellLiteral $effectiveMobileApiUrl
                 Start-MedLineTerminal 'Mobile' $mobileRoot "& $flutter run -d $quotedDevice --flavor development --dart-define=MEDLINE_API_URL=$quotedApiUrl"
             }
         }
