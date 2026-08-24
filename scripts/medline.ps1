@@ -550,7 +550,7 @@ function Start-MedLineRuntime {
             throw "API port $($options.ApiPort) is occupied by $(Get-ListenerDescription $apiListener), but it is not the MedLine API."
         }
     } else {
-        Start-MedLineTerminal 'API' $apiRoot "$apiEnvironment & $php artisan serve --host=127.0.0.1 --port=$($options.ApiPort)"
+        Start-MedLineTerminal 'API' $apiRoot "$apiEnvironment & $php artisan serve --host=0.0.0.0 --port=$($options.ApiPort)"
     }
 
     $reverbListener = Get-PortListener $options.ReverbPort
