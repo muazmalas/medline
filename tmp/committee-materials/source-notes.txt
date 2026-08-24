@@ -1,0 +1,47 @@
+MedLine committee artifacts - source and asset provenance
+
+No internet research or externally sourced non-trivial claims were used. Functional claims are grounded in the local MedLine repository and live local application state on 24 August 2026.
+
+Primary repository sources
+- README.md
+- docs/DOMAIN_SPECIFICATION.md
+- docs/API_WORKFLOWS.md
+- docs/API_CONTRACT.md
+- docs/ARCHITECTURE_DECISIONS.md
+- docs/ERD.md
+- docs/DESIGN_SYSTEM.md
+- docs/MOBILE_FEATURE_PARITY.md (cross-checked against current delivery source because one legacy sentence still lists superseded delivery steps)
+- docs/NOTIFICATION_OPERATIONS.md
+- docs/PRIVACY_AND_RETENTION.md
+- docs/SECURITY_OPERATIONS.md
+- docs/RELEASE_CONFIGURATION_MATRIX.md
+- docs/REQUIREMENTS_TRACEABILITY.md
+- docs/LOCAL_DEVELOPMENT.md
+- scripts/medline.ps1
+- api/routes/api.php
+- api/app/Http/Controllers/Api/DeliveryController.php
+- api/app/Http/Controllers/Api/OrderController.php
+- api/app/Http/Controllers/Api/OrderWorkflowController.php
+- api/app/Http/Controllers/Api/ProcurementController.php
+- api/app/Http/Controllers/Api/AdminController.php
+- api/database/seeders/DatabaseSeeder.php
+
+Current product captures
+- tmp/committee-materials/assets/pharmacy-dashboard.png - live local pharmacy workspace captured read-only from http://127.0.0.1:3001/
+- tmp/committee-materials/assets/pharmacy-orders.png - live local pharmacy order queue captured read-only
+- tmp/committee-materials/assets/pharmacy-inventory.png - live local pharmacy inventory captured read-only
+- tmp/committee-materials/assets/order-detail.png - live local stored OpenStreetMap road route and delivery timeline capture
+
+Earlier user-supplied product captures retained as supporting evidence
+- C:/Users/Muaz/AppData/Local/Temp/codex-clipboard-3O8zkT.png - driver map with available delivery routes and route-priced jobs
+- C:/Users/Muaz/AppData/Local/Temp/codex-clipboard-cmrFG3.png - driver delivery detail showing medicine manifest, price snapshot, recipient, and destination
+- C:/Users/Muaz/AppData/Local/Temp/codex-clipboard-Y7KXBv.png - driver workspace metrics
+
+Status source of truth
+- Patient order and procurement statuses: docs/DOMAIN_SPECIFICATION.md plus current controller transition logic.
+- Delivery statuses: current DeliveryController and current seed invariant set. The active sequence is available -> claimed -> pickup_started -> in_transit -> arrived -> delivered. Successful pickup PIN verification moves directly from pickup_started to in_transit; there is no separate driver "start delivery" action.
+- Organization, subscription, document, complaint, and user statuses: current controllers and domain specification.
+
+Demo data source of truth
+- api/database/seeders/DatabaseSeeder.php. It deletes existing application data in non-production, creates exactly 100 medicines, 10 Damascus pharmacies, 2 warehouses, 2 approved rated drivers, 2 patients, an unassociated administrator, active partner subscriptions, stocked inventory, 19 patient-order scenarios, 7 procurement scenarios, deliveries across every current state, ratings, notifications, complaints, and audit events.
+

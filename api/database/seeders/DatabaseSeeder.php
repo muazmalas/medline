@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Contracts\MapProvider;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -993,19 +992,103 @@ class DatabaseSeeder extends Seeder
 
     private function deliveryPrice(float $fromLatitude, float $fromLongitude, float $toLatitude, float $toLongitude): array
     {
-        $key = implode('|', [$fromLatitude, $fromLongitude, $toLatitude, $toLongitude]);
+        $key = implode('|', array_map(
+            static fn (float $coordinate): string => number_format($coordinate, 7, '.', ''),
+            [$fromLatitude, $fromLongitude, $toLatitude, $toLongitude],
+        ));
+
         if (! isset($this->roadRoutes[$key])) {
-            $route = app(MapProvider::class)->route($fromLatitude, $fromLongitude, $toLatitude, $toLongitude);
-            $distance = round((float) $route['distance_meters'] / 1000, 2);
+            $snapshot = $this->seededRoadRoutes()[$key] ?? null;
+            if (! is_array($snapshot)) {
+                throw new LogicException("No deterministic road-route snapshot exists for seed coordinates [$key].");
+            }
+
+            [$distanceMeters, $durationSeconds, $encodedGeometry] = $snapshot;
+            $geometryCoordinates = $this->decodePolyline6($encodedGeometry);
+            if (count($geometryCoordinates) < 2) {
+                throw new LogicException("The deterministic road-route snapshot for [$key] has invalid geometry.");
+            }
+
+            $distance = round((float) $distanceMeters / 1000, 2);
             $this->roadRoutes[$key] = [
                 'distance' => $distance,
                 'fee' => (float) round($distance * 100),
-                'geometry' => $route['geometry'],
-                'duration_seconds' => (int) $route['duration_seconds'],
-                'provider' => (string) $route['provider'],
+                'geometry' => ['type' => 'LineString', 'coordinates' => $geometryCoordinates],
+                'duration_seconds' => (int) $durationSeconds,
+                'provider' => 'osrm-seed-snapshot',
             ];
         }
 
         return $this->roadRoutes[$key];
+    }
+
+    /**
+     * Road routes captured from OSRM for every origin/destination pair in this
+     * destructive theater seed. Keeping the compact polyline snapshots here
+     * makes fresh installs deterministic and independent of network/TLS state.
+     *
+     * @return array<string, array{0: float, 1: int, 2: string}>
+     */
+    private function seededRoadRoutes(): array
+    {
+        return [
+            '33.5196900|36.2905000|33.5038000|36.2479000' => [6071, 538, 'sc{|~@g{~edA~BpW{oAvPwiAfs@b]fiBna@`gGmKpIrDbNyb@~vEuJ`Fa@rKz|Bhc@dIzJjLsErdIjaBlFh\\`X|Nz^_R|Co^ffDwnAec@tsHok@nlE}C~~A`TvkC|KleEtQbU`v@nfD~dBrzAoXtv@sm@~zCfj@~x@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.5196900|36.2905000|33.5121000|36.3151000' => [3259.1, 270, 'sc{|~@g{~edA~BpW{oAvPku@udAjk@a`ArZicFzPuVcJwPt{B_f\\dPgg@vd@y@zQmPpf@kwAdCkg@th@{J`_B_kAl^nQpDnRlMfIn~AwH'],
+            '33.5039000|36.2476000|33.5038000|36.2479000' => [1.3, 0, 'e~{{~@e~kcdAUI'],
+            '33.5179000|36.2779000|33.5121000|36.3151000' => [4595.3, 366, 'ktw|~@qdfedAmFy@kl@_rB_d@su@FwJmbBmeC~vDadDmgAsqBadDw{Ejk@a`ArZicFzPuVcJwPt{B_f\\dPgg@vd@y@zQmPpf@kwAdCkg@th@{J`_B_kAl^nQpDnRlMfIn~AwH'],
+            '33.5227000|36.2709000|33.5038000|36.2479000' => [3760, 386, '_x`}~@orxddAGeLv]ZwBn|FvDxG~YrF`r@{Uzm@zJfkChmEf`Ab`AjdA`b@vyA|Q~}@gF`}Bwl@xx@hlDxfBt}A}eAp}DEpWfi@pu@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.5187000|36.2840000|33.5121000|36.3151000' => [3994.9, 337, 'unx|~@kuredAd`@fbAnj@u^uvA}kDelE{vGjk@a`ArZicFzPuVcJwPt{B_f\\dPgg@vd@y@zQmPpf@kwAdCkg@th@{J`_B_kAl^nQpDnRlMfIn~AwH'],
+            '33.5120000|36.3154000|33.5038000|36.2479000' => [8576.2, 737, 'ubl|~@ezngdA|bDpRgDevDbRkPh[f@fhEdsD|eBjqDdfHt`UbAloA}sAzsQyvQ~cUy`@tO}c@hpIum@~~Ef^t_LvhAr|D~dBrzAcfAbvEfi@pu@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.5053000|36.2918000|33.5121000|36.3151000' => [4979.3, 334, 'ia_|~@yzafdAehAtFoBaq@znDvUnT{IqeFiYsx@sxAoEooAkgE{[nSigGwHsKqgLtDs|BmTtvAclSdPgg@z`@S~RmMhi@q{AdCkg@th@{J`_B_kAl^nQpDnRlMfIn~AwH'],
+            '33.4937000|36.2775000|33.5038000|36.2479000' => [5115.8, 499, 'w`h{~@qqeedAdMz|@_wBjp@~f@rzAtEn`Acp@sJmpOil@ee@}I}QxcJiPtpAcYz{@ou@rbA{cAzr@q~FjyAh@nMhPvQft@lcDxfBt}A}eAp}DEpWfi@pu@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.4943000|36.3021000|33.5121000|36.3151000' => [4151.2, 400, 'gri{~@kpufdAcRf@qBp_BmsBmCsmAkMmPma@~k@ao@dC{|@_F{YorGwmSo~BjfAyL}@moA{dCcyEucEafCmMwrA}_@ynB{BoI|S\\d_@jf@~bBgPtiApDjTlMfIn~AwH'],
+            '33.5219000|36.3202000|33.5038000|36.2479000' => [9842.3, 688, 's{~|~@g`ygdAyMw`A{\\q\\ymBiAe@vwCwd@~u@vLv`@rp@nR`uFf}GezAvvVfaDle@z`M_B|M`^aRn~HngDjZft@xmAf@fYwjBhoAi@vqBjxApN`Rbb@xHbgMekCdfDy`@tOkuAx}R~`@drIvhAr|D~dBrzAcfAbvEfi@pu@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.5039000|36.2476000|33.5121000|36.3151000' => [8717.4, 737, 'e~{{~@e~kcdA}qCkyCmoB}qAfCarAylAer@gi@qu@jYcdBsc@eQoVlL_[ic@meB{V}UocAkZsNuFgkEmvB`Fy~Awh@u|A{jBmiBmpE}~A|EmLmr@qZsE_C_dFec@k|EecBafIpDe|AsgBw`CmJmk@pbBgaDx}DenCoQom@jk@a`ArZicFzPuVcJwPv`@s`GbkBslUzt@aNnm@}cCvhC{vAlr@fo@n~AwH'],
+            '33.5179000|36.2779000|33.5038000|36.2479000' => [4307.3, 381, 'ktw|~@qdfedAiJxEvgFtcAlFh\\`X|Nz^_R|Co^ffDwnAec@tsHok@nlE}C~~A`TvkC|KleEtQbU`v@nfD~dBrzAoXtv@sm@~zCfj@~x@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '33.5227000|36.2709000|33.5121000|36.3151000' => [5239.1, 399, '_x`}~@orxddAn]iKkEagAec@k|EecBafIpDe|AsgBw`CmJmk@pbBgaDx}DenCoQom@jk@a`ArZicFzPuVcJwPv`@s`GbkBslUzt@aNnm@}cCvhC{vAlr@fo@n~AwH'],
+            '33.5187000|36.2840000|33.5038000|36.2479000' => [5158.8, 511, 'unx|~@kuredAd`@fbAnj@u^yVyo@vs@_e@zN@yDpgC_J|Lj}ClxIiNp^jO|e@~^fB~N}N|Co^ffDwnAec@tsHok@nlE}C~~A`TvkC|KleEtQbU`v@nfD~dBrzAoXtv@sm@~zCfj@~x@xlAdr@uAlj@xlCxtAhaB`qBhVbn@iEr\\'],
+            '36.2727800|37.2563900|33.5196900|36.2905000' => [367527.5, 15571, 'ib}ddAay}`fAkqNxljA`cnA`l^oj]zo`C|m{@p`v@bb~@eaHhxbAfjrCvgzRr`jN~pnG~oiBhrmDdznCpuhHj~I~c{Jux_ExavDi_PfqbAmbbAhpwBxfnAjlvSf~yAtno[s_fC~exEdxi@d`nA{iYtqfDbpgBdjsAk~PjbfBf|e@~xlGlvaGhww@w`y@xamDzk|Bd~zA~cgBtgsAj~sEntbAbfl@bcr@zdsB'],
+            '33.4749000|36.3048000|33.5196900|36.2905000' => [7551, 511, 'kvcz~@yxzfdAmJ_}C}gKl{KaGfhBtk@l{@~h@rqEcVlpE_sUyfCU|tBgp@x[en[yoBegCjeB_GvaC{_Hh]ebFr_E{rDoaGzkAii@'],
+        ];
+    }
+
+    /** @return array<int, array{0: float, 1: float}> */
+    private function decodePolyline6(string $encoded): array
+    {
+        $coordinates = [];
+        $index = 0;
+        $latitude = 0;
+        $longitude = 0;
+        $length = strlen($encoded);
+
+        while ($index < $length) {
+            $latitude += $this->decodePolylineValue($encoded, $index);
+            if ($index >= $length) {
+                throw new LogicException('A deterministic seed route contains a truncated polyline.');
+            }
+            $longitude += $this->decodePolylineValue($encoded, $index);
+            $coordinates[] = [$longitude / 1_000_000, $latitude / 1_000_000];
+        }
+
+        return $coordinates;
+    }
+
+    private function decodePolylineValue(string $encoded, int &$index): int
+    {
+        $result = 0;
+        $shift = 0;
+        $length = strlen($encoded);
+
+        do {
+            if ($index >= $length) {
+                throw new LogicException('A deterministic seed route contains a truncated polyline value.');
+            }
+
+            $byte = ord($encoded[$index++]) - 63;
+            $result |= ($byte & 0x1f) << $shift;
+            $shift += 5;
+        } while ($byte >= 0x20);
+
+        return ($result & 1) !== 0 ? ~($result >> 1) : ($result >> 1);
     }
 }

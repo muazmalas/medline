@@ -1,0 +1,39 @@
+Communication job
+By the end, the university committee should understand that MedLine is a coherent, role-secured medication logistics platform - not a collection of screens - because every patient order, pharmacy decision, warehouse replenishment, driver handoff, notification, and administrator intervention follows an auditable server-controlled workflow.
+
+30-minute narrative
+
+Speaker 1 - 00:00 to 07:00 - Why MedLine exists and how the system fits together
+- Slide 1 (00:30): Introduce MedLine and the team.
+- Slide 2 (01:00): Explain the four-speaker route through the presentation.
+- Slide 3 (02:00): Frame the coordination problem and the system-level answer.
+- Slide 4 (03:30): Explain the five roles, three clients/services, and the Laravel API trust boundary.
+
+Speaker 2 - 07:00 to 14:00 - Patient, pharmacy, warehouse, and stock workflows
+- Slide 5 (02:00): Walk through a patient order from pharmacy discovery to tracked delivery.
+- Slide 6 (02:00): Show pharmacy prescription and quantity review, including partial offers.
+- Slide 7 (02:00): Show inventory, batch traceability, and pharmacy-to-warehouse procurement.
+- Slide 8 (01:00): Decode patient order and procurement statuses.
+
+Speaker 3 - 14:00 to 21:30 - Driver routing and secure physical handoffs
+- Slide 9 (02:00): Show route-based job discovery, fee calculation, vehicle matching, and acceptance.
+- Slide 10 (01:45): Explain pickup verification between the fulfilment partner and driver.
+- Slide 11 (02:00): Explain in-transit tracking, arrival, and recipient verification.
+- Slide 12 (01:45): Decode the delivery state machine, failure, cancellation, and reassignment.
+
+Speaker 4 - 21:30 to 30:00 - Administration, assurance, demo readiness, and close
+- Slide 13 (02:00): Show role-aware administration and operational governance.
+- Slide 14 (02:00): Explain security, privacy, consistency, audit, and notifications.
+- Slide 15 (02:00): Explain the deterministic theater dataset and recommended live demo route.
+- Slide 16 (02:30): Resolve the opening claim, state current release boundaries, and invite questions.
+
+Central takeaway
+MedLine coordinates the complete medication journey with role-specific experiences, road-aware delivery, traceable stock, two-step handoff verification, and server-enforced consistency across web and mobile clients.
+
+Visual direction
+- 16:9, 1280 x 720.
+- White canvas with MedLine deep navy, brand blue, cyan, pale blue, and restrained green/orange/violet state accents.
+- Use the Codex Grid cover-image, two-column, evidence-table, and timeline compositions as references.
+- Use current local portal captures as product evidence; use native shapes only for simple role and workflow explanations.
+- Minimum visible type: 50 px deck title, 38 px slide titles, 24 px subheads, 18 px body.
+
