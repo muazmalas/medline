@@ -62,7 +62,8 @@ class CriticalWorkflowTest extends TestCase
             ->assertJsonPath('items.0.pickup_quantity', 2);
 
         $this->actingAs($driverUser)->postJson('/api/v1/deliveries/'.$deliveryId.'/claim', [], ['Idempotency-Key' => 'claim-critical-1'])->assertOk()->assertJsonPath('delivery.status', 'claimed');
-        $this->actingAs($driverUser)->postJson('/api/v1/deliveries/'.$deliveryId.'/status', ['status' => 'pickup_started'], ['Idempotency-Key' => 'status-critical-1'])->assertOk();
+        $this->actingAs($driverUser)->postJson('/api/v1/deliveries/'.$deliveryId.'/status', ['status' => 'pickup_started'], ['Idempotency-Key' => 'status-critical-1'])->assertUnprocessable();
+        $this->actingAs($pharmacyUser)->postJson('/api/v1/deliveries/'.$deliveryId.'/pickup-verification/initiate')->assertOk();
         $this->actingAs($driverUser)->postJson('/api/v1/deliveries/'.$deliveryId.'/status', ['status' => 'arrived'], ['Idempotency-Key' => 'status-critical-skip'])->assertStatus(409);
 
         $this->assertDatabaseHas('deliveries', ['id' => $deliveryId, 'driver_id' => $driverId, 'status' => 'pickup_started']);

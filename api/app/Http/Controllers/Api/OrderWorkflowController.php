@@ -9,8 +9,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\NotificationService;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Support\AuditService;
@@ -143,7 +141,6 @@ class OrderWorkflowController extends Controller
                 'delivery_id' => $deliveryId,
                 'message' => 'Your order is ready for delivery.',
             ]);
-            NotificationService::send($order->patient_id, 'delivery.pin_available', ['delivery_id' => $deliveryId, 'message' => 'Your delivery PIN is available in the secure order screen.']);
             DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.available', ['delivery_id' => $deliveryId, 'message' => 'A new delivery job is available.']));
         }
 
@@ -179,7 +176,6 @@ class OrderWorkflowController extends Controller
 
         if ($result['delivery_id']) {
             NotificationService::send($order->patient_id, 'delivery.created', ['delivery_id' => $result['delivery_id'], 'message' => 'Your approved partial order is ready for delivery.']);
-            NotificationService::send($order->patient_id, 'delivery.pin_available', ['delivery_id' => $result['delivery_id'], 'message' => 'Your delivery PIN is available in the secure order screen.']);
             DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.available', ['delivery_id' => $result['delivery_id'], 'message' => 'A new delivery job is available.']));
         }
         $pharmacyUserId = Partner::whereKey($order->pharmacy_id)->value('user_id');
@@ -192,14 +188,11 @@ class OrderWorkflowController extends Controller
     {
         $existing = DB::table('deliveries')->where('order_id', $order->id)->value('id');
         if ($existing) return (int) $existing;
-        $pin = (string) random_int(100000, 999999);
         return DB::table('deliveries')->insertGetId([
             'public_id' => (string) Str::ulid(),
             'order_id' => $order->id,
             'status' => 'available',
             'scheduled_for' => $order->scheduled_delivery_at,
-            'pin_hash' => Hash::make($pin),
-            'pin_encrypted' => Crypt::encryptString($pin),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

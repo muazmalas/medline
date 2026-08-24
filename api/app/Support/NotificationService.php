@@ -64,7 +64,6 @@ class NotificationService
             'delivery.failed' => 'تعذر إكمال التوصيل ويحتاج إلى متابعة.',
             'delivery.picked_up' => 'تم استلام طلبك من الصيدلية.',
             'delivery.in_transit' => 'طلبك في الطريق إليك.',
-            'delivery.pin_available' => 'رمز التوصيل متاح في شاشة الطلب الآمنة.',
             'delivery.completed' => 'تم إكمال التوصيل بنجاح.',
             'payment.recorded' => 'تم تسجيل الدفع عند الاستلام.',
             'prescription.awaiting_review' => 'توجد وصفة طبية بانتظار مراجعة الصيدلي.',

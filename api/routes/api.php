@@ -78,6 +78,7 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::get('/verification-documents/{document}/download-url', [VerificationDocumentController::class, 'downloadUrl']);
         Route::get('/orders', [OrderController::class, 'index'])->middleware('role:patient,admin');
         Route::get('/delivery-pricing/current', [DeliveryPricingController::class, 'current']);
+        Route::get('/delivery-pricing/estimate', [DeliveryPricingController::class, 'estimate']);
         Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('role:patient,admin,pharmacy,driver');
         Route::post('/orders', [OrderController::class, 'store'])->middleware(['role:patient', 'throttle:mutations']);
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware(['role:patient,admin', 'throttle:mutations']);
@@ -120,9 +121,16 @@ Route::middleware('throttle:api')->prefix('v1')->group(function () {
         Route::get('/deliveries/mine', [DeliveryController::class, 'mine'])->middleware('role:patient,driver');
         Route::get('/deliveries/{delivery}', [DeliveryController::class, 'show'])->middleware('role:admin,patient,driver,pharmacy,warehouse');
         Route::get('/partner/deliveries', [DeliveryController::class, 'partnerMine'])->middleware('role:pharmacy,warehouse');
+        Route::post('/deliveries/{delivery}/accept-order', [DeliveryController::class, 'acceptOrder'])->middleware(['role:driver', 'throttle:mutations']);
+        // Backward-compatible alias for clients released before order acceptance was named explicitly.
         Route::post('/deliveries/{delivery}/claim', [DeliveryController::class, 'claim'])->middleware(['role:driver', 'throttle:mutations']);
         Route::post('/deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->middleware(['role:driver', 'throttle:mutations']);
         Route::post('/deliveries/{delivery}/location', [DeliveryController::class, 'updateLocation'])->middleware(['role:driver', 'throttle:location']);
+        Route::post('/deliveries/{delivery}/pickup-verification/initiate', [DeliveryController::class, 'initiatePickupVerification'])->middleware(['role:pharmacy,warehouse', 'throttle:mutations']);
+        Route::post('/deliveries/{delivery}/pickup-verification/verify', [DeliveryController::class, 'verifyPickup'])->middleware(['role:pharmacy,warehouse', 'throttle:mutations']);
+        Route::post('/deliveries/{delivery}/recipient-verification/initiate', [DeliveryController::class, 'initiateRecipientVerification'])->middleware(['role:driver', 'throttle:mutations']);
+        Route::post('/deliveries/{delivery}/recipient-verification/verify', [DeliveryController::class, 'verifyRecipient'])->middleware(['role:driver', 'throttle:mutations']);
+        // Backward-compatible alias; new clients use recipient-verification/verify with a 4-digit code.
         Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->middleware(['role:driver', 'throttle:mutations']);
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->middleware('role:admin');
         Route::get('/admin/notification-delivery-health', [AdminController::class, 'notificationDeliveryHealth'])->middleware('role:admin');

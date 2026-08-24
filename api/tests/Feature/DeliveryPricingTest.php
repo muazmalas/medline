@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\MapProvider;
 use App\Models\Medicine;
 use App\Models\Order;
 use App\Models\Partner;
@@ -13,6 +14,28 @@ use Tests\TestCase;
 class DeliveryPricingTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->app->instance(MapProvider::class, new class implements MapProvider
+        {
+            public function geocode(string $address): array
+            {
+                return ['latitude' => 0.0, 'longitude' => 0.0, 'display_name' => $address];
+            }
+
+            public function route(float $fromLatitude, float $fromLongitude, float $toLatitude, float $toLongitude): array
+            {
+                return [
+                    'distance_meters' => 111190.0,
+                    'duration_seconds' => 7200,
+                    'geometry' => ['type' => 'LineString', 'coordinates' => [[$fromLongitude, $fromLatitude], [$toLongitude, $toLatitude]]],
+                    'provider' => 'test-router',
+                ];
+            }
+        });
+    }
 
     public function test_administrator_can_change_the_rate_and_every_version_is_audited(): void
     {

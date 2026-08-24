@@ -59,17 +59,17 @@ Every completed task should include a short note in the Implementation Log.
 | Field | Value |
 |---|---|
 | Current phase | Localhost integration and validation - Phases 13, 23, 24 |
-| Current task | Run backend, web, and Android Flutter validation against the local MySQL profile |
-| Last completed task | Added local Reverb broadcasting, Echo subscription, email-log triggering, no-Redis/no-ClamAV defaults, local business assumptions, and Android test instructions |
-| Next task | Record test results, commit the single repository, and push `git@github.com:muazmalas/medline.git` |
+| Current task | Owner-led physical-device acceptance and release signing |
+| Last completed task | Implemented the full patient, pharmacy, warehouse, driver, and administrator mobile workflow surface and validated API, web, Flutter, and Android packaging |
+| Next task | Exercise all five roles on physical Android devices with deployment credentials, then sign and promote the approved release |
 | Blockers | No source blocker; production secrets, DNS/HTTPS, signing keys, and provider accounts must be supplied by the deployment owner |
 | Backend status | Core B2C/B2B domain, bounded database transactions, compensated private uploads, security boundaries, notifications, dashboards, and operational APIs implemented; owner verification pending |
 | React status | Authenticated role-aware dashboards, localized metric cards, live operational refreshes, catalog, partner management, prescription review, procurement, privacy-scoped delivery monitoring with validated OpenStreetMap embedding, support, notifications, and settings implemented |
-| Flutter status | Role-gated shell, sign-in/session flow, patient ordering, partner queues, live dashboard metrics, driver delivery lifecycle, scoped encrypted offline mutation replay, Android flavors, and web host implemented |
+| Flutter status | Full current-workflow portal parity implemented: role protection, registration/subscription correction, medicine/order/procurement/inventory/delivery workflows, item prescriptions and partial decisions, batch allocation, maps/PIN/location, administration, security, notifications, support, and settings |
 | Database status | Initial production-shaped schema migrated and seeded |
-| Testing status | Laravel 23 tests/64 assertions and React 5 UI tests pass; React coverage is 10.29% statements and 17.39% lines, while Laravel percentage coverage awaits Xdebug/PCOV; Flutter widget tests are authored but SDK execution remains blocked; interactive browser/device acceptance remains an owner check |
+| Testing status | 20 Aug 2026: Laravel 53 tests/381 assertions passed; React 49 UI tests and production build passed; Flutter analysis and widget tests passed; Android development, staging, and production debug flavors assembled successfully. Interactive browser/device acceptance remains an owner check |
 | Deployment status | Native Windows and Flutter mobile release handoff documentation created; IIS CSP now explicitly permits only the OpenStreetMap embed origin; signing/provider secrets remain deployment-owner configuration |
-| Last updated | 2026-08-19 |
+| Last updated | 2026-08-20 |
 
 ### Context recovery checklist
 
@@ -226,7 +226,7 @@ The existing thesis and screenshots define the visual direction and principal wo
 
 ### Patient order statuses
 
-`draft` → `pending_pharmacy_review` → `prescription_review` → `accepted` / `partially_accepted` / `rejected` → `ready_for_delivery` → `driver_claimed` → `picked_up` → `in_transit` → `delivered` → `completed`
+`draft` → `pending_pharmacy_review` → `prescription_review` → `accepted` / `partially_accepted` / `rejected` → `ready_for_delivery` → `driver_claimed` → `in_transit` → `delivered` → `completed`
 
 Possible terminal or recovery statuses:
 
@@ -234,7 +234,7 @@ Possible terminal or recovery statuses:
 
 ### Procurement order statuses
 
-`draft` → `pending_warehouse_review` → `accepted` / `rejected` → `ready_for_delivery` → `driver_claimed` → `picked_up` → `in_transit` → `delivered` → `completed`.
+`draft` → `pending_warehouse_review` → `accepted` / `rejected` → `ready_for_delivery` → `driver_claimed` → `in_transit` → `delivered` → `completed`.
 
 ### Subscription statuses
 
@@ -242,7 +242,7 @@ Possible terminal or recovery statuses:
 
 ### Delivery statuses
 
-`available`, `claimed`, `pickup_started`, `picked_up`, `in_transit`, `arrived`, `delivered`, `failed`, `cancelled`, `reassigned`.
+`available`, `claimed`, `pickup_started`, `in_transit`, `arrived`, `delivered`, `failed`, `cancelled`, `reassigned`.
 
 No client may directly set an arbitrary status. Every transition must be validated by the backend according to actor, previous state, required data, and business rules.
 
@@ -527,7 +527,7 @@ medline/
 - [x] Delivery job available.
 - [x] Delivery claimed by driver.
 - [x] Driver approaching or arrived.
-- [x] Order picked up.
+- [x] Pickup verified; order automatically enters transit.
 - [x] Order in transit.
 - [x] Delivery failed.
 - [x] Delivery PIN available.
@@ -1023,7 +1023,10 @@ A task is complete only when:
 Record meaningful changes here so work can resume without reconstructing context.
 
 | Date | Phase | Work completed | Files changed | Verification | Notes |
+| 2026-08-24 | Delivery security / portal / mobile / email | Replaced the legacy single delivery PIN with pharmacy-or-warehouse-to-driver pickup verification and driver-to-recipient handoff verification; added four-digit expiring hash-only codes, resend cooldowns, persistent attempt lockout, role-gated APIs, purpose-specific professional emails, portal and Flutter step UI, and consistent theater seed states | `api/database/migrations/2026_08_24_010000_add_two_step_delivery_verification.php`, delivery/order/procurement controllers, `MedlineMail`, email views, `web/src/App.tsx`, `web/src/style.css`, `mobile/lib/features/deliveries/delivery_pages.dart`, seeders, API docs | Source review only at owner request; no tests, builds, migrations, seeds, or emails executed | All demo outbound email continues through the configured global test-inbox redirect; codes are never returned by API |
 |---|---|---|---|---|---|
+| 2026-08-20 | Mobile runtime regression | Fixed the standalone notification route so every text field has a Material page ancestor; made collection decoding accept both direct arrays and paginated API envelopes so order details render correctly in Flutter web and native builds; added focused regression tests and the Cupertino icon asset | `mobile/lib/core/mobile_ui.dart`, `mobile/lib/features/workspace/workspace_shell.dart`, `mobile/test/core_widgets_test.dart`, `mobile/pubspec.*` | Flutter analyze passed; 4 Flutter tests passed; Flutter web release build passed; all Android debug flavors assembled | Existing browser tabs must reload the newly generated Flutter web bundle |
+| 2026-08-20 | Full mobile parity / validation | Replaced the legacy Flutter home with a protected role workspace and implemented every current major portal workflow for patient, pharmacy, warehouse, driver, and administrator accounts; added secure procurement PIN projection, organization corrections, admin 2FA enforcement, notification health, consolidated subscription reviews, and the parity matrix | `mobile/lib/**`, `mobile/pubspec.*`, `api/app/Http/Controllers/Api/**`, `api/routes/api.php`, `api/tests/Feature/**`, `docs/MOBILE_FEATURE_PARITY.md`, API/design/traceability docs | Laravel 53 tests/381 assertions; React 49 tests and production build; Flutter analyze/tests; Gradle `assembleDebug` for development/staging/production all passed | Signed release and real-device acceptance remain owner gates |
 | 2026-08-18 | Planning | Created complete production implementation tracker | `MEDLINE_IMPLEMENTATION_TRACKER.md` | File created and reviewed | Initial source of truth |
 | 2026-08-18 | Phases 0-4 | Scaffolded Laravel 12 API, configured native MySQL, installed Sanctum, created schema, seed data, and API foundation | `api/` | `php artisan migrate:fresh --seed`, `php artisan route:list` | Docker intentionally not used |
 | 2026-08-18 | Phases 3, 5, 7-8 | Added users/roles, partners, drivers, medicines, inventory, orders, prescriptions, deliveries, subscriptions, complaints, ratings, audit, and idempotency tables | `api/database/migrations/`, `api/app/Models/` | MySQL migrations completed | Initial production-shaped domain schema |
@@ -1919,9 +1922,8 @@ stateDiagram-v2
     prescription_review --> cancelled: Prescription rejected
     pending_pharmacy_review --> cancelled: Pharmacy rejects
     accepted --> claimed: Driver claims delivery
-    claimed --> pickup_started: Driver starts pickup
-    pickup_started --> picked_up: Pharmacy hands over medicines
-    picked_up --> in_transit: Driver leaves pickup
+    claimed --> pickup_started: Pickup partner sends driver PIN
+    pickup_started --> in_transit: Pickup PIN verified and driver receives medicines
     in_transit --> arrived: Driver reaches destination
     arrived --> delivered: PIN/confirmation completed
     accepted --> cancelled: Cancellation before dispatch
@@ -2088,9 +2090,10 @@ The location picker uses OpenStreetMap tiles and stores the selected coordinates
 
 ### Authentication scope decision
 
-- [x] Removed the authenticator-code field from login.
-- [x] Removed administrator 2FA enforcement from the login API.
-- [x] Removed public 2FA API routes and hid the legacy settings panel.
-- [x] Placed the registration entry point inside the login-card experience.
+- [x] Administrator accounts are provisioned; they cannot self-register.
+- [x] Administrator authenticator protection can be configured from both portal and mobile settings.
+- [x] When enabled, administrator login enforces a valid six-digit TOTP code in the API, web portal, and Flutter app.
+- [x] Patient, pharmacy, warehouse, and driver registration remains inside the role-specific login experience.
+- [x] Patient and driver registration creates no subscription; pharmacy and warehouse registration includes exact payment evidence.
 
-The legacy database columns and dormant controller methods may remain in an existing database for backward-compatible migration safety, but they are no longer reachable through the API or user interface. If the database is rebuilt from migrations, these legacy columns can be removed in a later cleanup migration after confirming no external client depends on them.
+Authenticator recovery codes and production account-recovery policy remain owner security decisions. The API—not client visibility—enforces administrator 2FA and all role boundaries.

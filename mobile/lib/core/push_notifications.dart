@@ -15,7 +15,8 @@ class PushNotificationService {
 
   static Future<void> register(Session session) {
     _session = session;
-    return _initializing ??= _register(session).whenComplete(() => _initializing = null);
+    return _initializing ??=
+        _register(session).whenComplete(() => _initializing = null);
   }
 
   static Future<void> revoke(Session session) async {
@@ -25,28 +26,35 @@ class PushNotificationService {
     await _refreshSubscription?.cancel();
     _refreshSubscription = null;
     if (token == null || !session.isAuthenticated) return;
-    try { await session.api.revokeDeviceToken(token); } catch (_) { /* Logout still clears local auth. */ }
+    try {
+      await session.api.revokeDeviceToken(token);
+    } catch (_) {/* Logout still clears local auth. */}
   }
 
   static Future<void> _register(Session session) async {
     if (!session.isAuthenticated || !_hasConfiguration) return;
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: const FirebaseOptions(
+        await Firebase.initializeApp(
+            options: const FirebaseOptions(
           apiKey: String.fromEnvironment('MEDLINE_FIREBASE_API_KEY'),
           appId: String.fromEnvironment('MEDLINE_FIREBASE_APP_ID'),
-          messagingSenderId: String.fromEnvironment('MEDLINE_FIREBASE_SENDER_ID'),
+          messagingSenderId:
+              String.fromEnvironment('MEDLINE_FIREBASE_SENDER_ID'),
           projectId: String.fromEnvironment('MEDLINE_FIREBASE_PROJECT_ID'),
         ));
       }
       final messaging = FirebaseMessaging.instance;
-      final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+      final settings = await messaging.requestPermission(
+          alert: true, badge: true, sound: true);
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
       final token = await messaging.getToken();
       if (token != null) await _saveToken(session.api, token);
       await _refreshSubscription?.cancel();
       _refreshSubscription = messaging.onTokenRefresh.listen((nextToken) async {
-        if (_session?.isAuthenticated == true) await _saveToken(_session!.api, nextToken);
+        if (_session?.isAuthenticated == true) {
+          await _saveToken(_session!.api, nextToken);
+        }
       });
     } catch (_) {
       // Provider setup is optional until the release owner supplies Firebase
@@ -60,7 +68,8 @@ class PushNotificationService {
     _registeredToken = token;
   }
 
-  static bool get _hasConfiguration => const String.fromEnvironment('MEDLINE_FIREBASE_API_KEY').isNotEmpty &&
+  static bool get _hasConfiguration =>
+      const String.fromEnvironment('MEDLINE_FIREBASE_API_KEY').isNotEmpty &&
       const String.fromEnvironment('MEDLINE_FIREBASE_APP_ID').isNotEmpty &&
       const String.fromEnvironment('MEDLINE_FIREBASE_SENDER_ID').isNotEmpty &&
       const String.fromEnvironment('MEDLINE_FIREBASE_PROJECT_ID').isNotEmpty;

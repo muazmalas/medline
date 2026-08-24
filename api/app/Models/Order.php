@@ -14,7 +14,7 @@ class Order extends Model
         'public_id', 'patient_id', 'pharmacy_id', 'address_id', 'status',
         'payment_method', 'payment_status', 'subtotal', 'tax_rate', 'tax_amount', 'delivery_fee', 'total',
         'delivery_pricing_rate_id', 'delivery_distance_km', 'delivery_rate_per_km', 'delivery_vehicle_type',
-        'delivery_latitude', 'delivery_longitude',
+        'delivery_latitude', 'delivery_longitude', 'delivery_route_geometry', 'delivery_route_duration_seconds', 'delivery_route_provider',
         'delivery_address_snapshot', 'delivery_preference', 'scheduled_delivery_at', 'patient_note', 'partial_offer_note', 'partial_offered_at',
         'patient_decision_note', 'patient_decided_at',
     ];
@@ -30,6 +30,8 @@ class Order extends Model
             'delivery_rate_per_km' => 'decimal:2',
             'delivery_latitude' => 'decimal:7',
             'delivery_longitude' => 'decimal:7',
+            'delivery_route_geometry' => 'array',
+            'delivery_route_duration_seconds' => 'integer',
             'total' => 'decimal:2',
             'scheduled_delivery_at' => 'datetime',
             'partial_offered_at' => 'datetime',

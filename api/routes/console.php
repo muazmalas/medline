@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use App\Support\NotificationService;
+use App\Services\DeliveryPricingService;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -82,3 +83,103 @@ Artisan::command('medline:auth-artifacts-prune', function () {
 })->purpose('Remove expired bearer tokens and short-lived authentication artifacts');
 
 Schedule::command('medline:auth-artifacts-prune')->dailyAt('03:30');
+
+Artisan::command('medline:routes:backfill {--force : Recalculate routes that already have a snapshot}', function () {
+    /** @var DeliveryPricingService $pricing */
+    $pricing = app(DeliveryPricingService::class);
+    $force = (bool) $this->option('force');
+    $updated = 0;
+    $failed = 0;
+    $skipped = 0;
+
+    $orders = DB::table('orders')
+        ->join('partners as pharmacies', 'pharmacies.id', '=', 'orders.pharmacy_id')
+        ->leftJoin('addresses', 'addresses.id', '=', 'orders.address_id')
+        ->when(! $force, fn ($query) => $query->whereNull('orders.delivery_route_geometry'))
+        ->select(
+            'orders.id', 'orders.public_id', 'orders.subtotal', 'orders.tax_amount', 'orders.delivery_pricing_rate_id',
+            'orders.delivery_rate_per_km', 'orders.delivery_vehicle_type',
+            'pharmacies.latitude as from_latitude', 'pharmacies.longitude as from_longitude',
+            DB::raw('COALESCE(orders.delivery_latitude, addresses.latitude) as to_latitude'),
+            DB::raw('COALESCE(orders.delivery_longitude, addresses.longitude) as to_longitude'),
+        )
+        ->orderBy('orders.id')
+        ->get();
+
+    foreach ($orders as $order) {
+        if ($order->from_latitude === null || $order->from_longitude === null || $order->to_latitude === null || $order->to_longitude === null) {
+            $this->warn("Skipped {$order->public_id}: route coordinates are incomplete.");
+            $skipped++;
+            continue;
+        }
+
+        try {
+            $rate = $order->delivery_rate_per_km !== null
+                ? (object) ['id' => $order->delivery_pricing_rate_id, 'rate_per_km' => (float) $order->delivery_rate_per_km]
+                : $pricing->current($order->delivery_vehicle_type);
+            $estimate = $pricing->estimate((float) $order->from_latitude, (float) $order->from_longitude, (float) $order->to_latitude, (float) $order->to_longitude, $rate);
+            DB::table('orders')->where('id', $order->id)->update([
+                'delivery_distance_km' => $estimate['distance_km'],
+                'delivery_rate_per_km' => $estimate['rate_per_km'],
+                'delivery_fee' => $estimate['fee'],
+                'delivery_route_geometry' => json_encode($estimate['route_geometry'], JSON_THROW_ON_ERROR),
+                'delivery_route_duration_seconds' => $estimate['route_duration_seconds'],
+                'delivery_route_provider' => $estimate['route_provider'],
+                'total' => (float) $order->subtotal + (float) $order->tax_amount + $estimate['fee'],
+                'updated_at' => now(),
+            ]);
+            $updated++;
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->warn("Skipped {$order->public_id}: the road route provider was unavailable.");
+            $failed++;
+        }
+    }
+
+    $procurements = DB::table('procurement_orders')
+        ->join('partners as warehouses', 'warehouses.id', '=', 'procurement_orders.warehouse_id')
+        ->join('partners as pharmacies', 'pharmacies.id', '=', 'procurement_orders.pharmacy_id')
+        ->when(! $force, fn ($query) => $query->whereNull('procurement_orders.delivery_route_geometry'))
+        ->select(
+            'procurement_orders.id', 'procurement_orders.public_id', 'procurement_orders.status', 'procurement_orders.subtotal',
+            'procurement_orders.delivery_pricing_rate_id', 'procurement_orders.delivery_rate_per_km', 'procurement_orders.delivery_vehicle_type',
+            'warehouses.latitude as from_latitude', 'warehouses.longitude as from_longitude',
+            'pharmacies.latitude as to_latitude', 'pharmacies.longitude as to_longitude',
+        )
+        ->orderBy('procurement_orders.id')
+        ->get();
+
+    foreach ($procurements as $order) {
+        if ($order->from_latitude === null || $order->from_longitude === null || $order->to_latitude === null || $order->to_longitude === null) {
+            $this->warn("Skipped {$order->public_id}: route coordinates are incomplete.");
+            $skipped++;
+            continue;
+        }
+
+        try {
+            $rate = $order->delivery_rate_per_km !== null
+                ? (object) ['id' => $order->delivery_pricing_rate_id, 'rate_per_km' => (float) $order->delivery_rate_per_km]
+                : $pricing->current($order->delivery_vehicle_type);
+            $estimate = $pricing->estimate((float) $order->from_latitude, (float) $order->from_longitude, (float) $order->to_latitude, (float) $order->to_longitude, $rate);
+            $zeroTotalStatuses = ['rejected', 'cancelled', 'partial_offer_rejected'];
+            DB::table('procurement_orders')->where('id', $order->id)->update([
+                'delivery_distance_km' => $estimate['distance_km'],
+                'delivery_rate_per_km' => $estimate['rate_per_km'],
+                'delivery_fee' => $estimate['fee'],
+                'delivery_route_geometry' => json_encode($estimate['route_geometry'], JSON_THROW_ON_ERROR),
+                'delivery_route_duration_seconds' => $estimate['route_duration_seconds'],
+                'delivery_route_provider' => $estimate['route_provider'],
+                'total' => in_array($order->status, $zeroTotalStatuses, true) ? 0 : (float) $order->subtotal + $estimate['fee'],
+                'updated_at' => now(),
+            ]);
+            $updated++;
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->warn("Skipped {$order->public_id}: the road route provider was unavailable.");
+            $failed++;
+        }
+    }
+
+    $this->info("Stored {$updated} authoritative road route snapshot(s). Skipped: {$skipped}. Failed: {$failed}.");
+    return $failed > 0 ? 1 : 0;
+})->purpose('Backfill stored road geometry, distance, duration, and route-based delivery fees');

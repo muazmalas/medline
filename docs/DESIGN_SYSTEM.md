@@ -25,6 +25,8 @@ MedLine uses a calm medical-blue foundation with high-contrast operational state
 - Operational content uses cards, metric grids, searchable tables, queues, detail panels, and status pills.
 - Mobile uses Material 3 surfaces, padded list/card layouts, and role-specific action cards.
 - Forms use full-width controls on narrow screens and inline/row layouts when space permits.
+- Warehouse procurement review uses a vertical decision hierarchy: full-width stock adjustment first, delivery request second, then cost and delivery summaries. This keeps quantity, batch, comment, and decision controls readable before secondary schedule information.
+- Wide medicine and batch tables scroll inside their own table region rather than compressing fields or overflowing the page.
 - Private or sensitive values are never represented as decorative UI-only state; the API remains authoritative.
 
 ## Typography and hierarchy
@@ -42,6 +44,7 @@ MedLine uses a calm medical-blue foundation with high-contrast operational state
 - Approve/success action: green semantic treatment.
 - Reject/destructive action: red/orange semantic treatment and confirmation where appropriate.
 - Status pill: compact server-backed state; clients do not invent state transitions.
+- Workflow status controls expose only states produced by current server transitions. Delivery progress remains on the delivery record instead of being duplicated as an order or procurement status.
 - Metric card: count plus scope/context, never a substitute for the underlying queue.
 - Timeline: chronological server event history for orders and deliveries.
 - Empty state: explains what is absent and provides a safe recovery action when available.

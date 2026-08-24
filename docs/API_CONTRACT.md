@@ -52,13 +52,17 @@ Authenticated partners can read `/subscription/plans` for the plan catalog match
 
 Pharmacy partners can read `/pharmacy/prescriptions?status=pending_review` and review only prescriptions belonging to their own orders through `/pharmacy/prescriptions/{id}/review`; files remain available only through authorized private download URLs.
 
-Pharmacy and warehouse partners can read `/procurement/{id}` for an owned procurement, its line items, delivery record, and delivery-event timeline. Cross-partner procurement access is rejected server-side.
+Pharmacy and warehouse partners can read `/procurement/{id}` for an owned procurement, its line items, delivery record, and delivery-event timeline; administrators may open the same detail for operational support. For warehouse reviewers, every line includes eligible `batch_options`. Acceptance and partial-acceptance decisions submit exact `{inventory_id, quantity}` allocations whose total must equal the accepted line quantity. The selected batches remain reserved until delivery completion, when those exact batches are consumed. Cross-partner procurement access is rejected server-side.
+
+Each warehouse `PUT /partner/inventory` creates a distinct batch record, including its optional lot, production, expiry, receiving, and storage metadata. Pharmacy ordering remains medicine-level: the warehouse chooses the supplying batch during review, and the allocation history remains attached to the procurement item. Pharmacy-owned inventory continues to be maintained as an aggregate medicine record.
+
+Medicine catalog entries are never permanently deleted through the API. Administrators use `/medicines/{id}/status` to deactivate or reactivate a record; inactive medicines are excluded from patient ordering, pharmacy replenishment, and new warehouse stock selection.
 
 Administrators can review `/admin/ratings` and use `/admin/ratings/{rating}/moderate` with `hide` or `restore`; moderation is audited and hidden ratings remain recoverable. Completed-order rating submissions accept the same optional idempotency header, and duplicate concurrent submissions return a stable conflict.
 
 Administrators can update a user's role through `/admin/users/{id}/role`. Partner and driver assignments require the corresponding profile, and the current administrator cannot change their own role.
 
-Administrators can review partner applications through `/admin/partners` and submit `approve`, `reject`, or `correction` decisions to `/admin/partners/{id}/decision`; each decision is authorized and audited.
+Administrators can review pharmacy and warehouse applications through the compatibility route `/admin/partners` and submit `approve`, `reject`, or `correction` decisions to `/admin/partners/{id}/decision`; each decision is authorized and audited.
 
 ## Localization
 
@@ -80,7 +84,7 @@ This applies to patient orders, procurement creation and decisions, partner inve
 
 Patient orders containing prescription-required medicines enter `prescription_required` and cannot be accepted by a pharmacy until the patient uploads a prescription and the pharmacist approves it. They then progress through pharmacy review, acceptance/partial acceptance, readiness, delivery, and completion. Cancellation is permitted only before the delivery is in transit and releases reservations transactionally.
 
-Delivery transitions are sequential: `available → claimed → pickup_started → picked_up → in_transit → arrived → delivered`. A driver must be approved and available to list or claim new jobs. Completion requires the six-digit patient PIN, is lock-protected after repeated failures, and atomically settles inventory and payment status.
+Delivery transitions are sequential: `available → claimed → pickup_started → in_transit → arrived → delivered`. A driver must be approved and available to list or accept new jobs. The pickup partner initiates a four-digit code sent to the assigned driver; entering it confirms pickup and automatically starts transit. After arrival, the driver initiates a separate four-digit code sent to the recipient and enters it to complete the handoff. Codes are hash-only, expire after 10 minutes by default, enforce a resend cooldown, lock after repeated failures, and are never returned by an API. Final recipient verification atomically settles inventory and payment status.
 
 ## Notifications and providers
 

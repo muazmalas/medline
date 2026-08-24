@@ -12,10 +12,10 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 use Illuminate\Support\Facades\Log;
 use App\Support\DatabaseTransaction;
+use App\Support\MedlineMail;
 
 class DispatchExternalNotification implements ShouldQueue
 {
@@ -90,9 +90,7 @@ class DispatchExternalNotification implements ShouldQueue
         $targetKey = hash('sha256', 'email:' . strtolower($user->email));
         if (! $this->claimTarget('email', $targetKey)) return;
         try {
-            Mail::raw((string) ($this->data['message'] ?? 'You have a new MedLine update.'), function ($message) use ($user) {
-                $message->to($user->email)->subject('MedLine notification');
-            });
+            MedlineMail::notification($user, $this->type, $this->data);
             $this->recordSuccess('email', 'mail', null, $targetKey);
         } catch (Throwable $exception) {
             $this->recordFailure('email', 'mail', $exception->getMessage(), $targetKey);

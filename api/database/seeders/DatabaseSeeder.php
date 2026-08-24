@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Contracts\MapProvider;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -12,7 +12,10 @@ use LogicException;
 
 class DatabaseSeeder extends Seeder
 {
-    private const DEMO_PIN = '246810';
+    private const DEMO_VERIFICATION_CODE = '2468';
+
+    /** @var array<string, array<string, mixed>> */
+    private array $roadRoutes = [];
 
     public function run(): void
     {
@@ -502,7 +505,7 @@ class DatabaseSeeder extends Seeder
             ['THR-ORD-PARTIAL-ACCEPT', 'partially_accepted', 1, 4, 28, 3, 2, 'claimed', 1],
             ['THR-ORD-AVAILABLE', 'accepted', 0, 5, 35, 1, 1, 'available', null],
             ['THR-ORD-PICKUP-START', 'accepted', 1, 6, 42, 1, 1, 'pickup_started', 0],
-            ['THR-ORD-PICKED-UP', 'accepted', 0, 7, 49, 1, 1, 'picked_up', 1],
+            ['THR-ORD-IN-TRANSIT', 'accepted', 0, 7, 49, 1, 1, 'in_transit', 1],
             ['THR-ORD-ARRIVED', 'accepted', 1, 8, 56, 1, 1, 'arrived', 0],
             ['THR-ORD-FAILED', 'accepted', 0, 9, 63, 1, 1, 'failed', 1],
             ['THR-ORD-CANCEL-EARLY', 'cancelled', 1, 1, 8, 1, 0, null, null],
@@ -537,6 +540,8 @@ class DatabaseSeeder extends Seeder
                 'tax_rate' => $taxRate, 'tax_amount' => $taxAmount, 'delivery_fee' => $pricing['fee'],
                 'delivery_pricing_rate_id' => $rateId, 'delivery_distance_km' => $pricing['distance'],
                 'delivery_rate_per_km' => 100, 'delivery_latitude' => $patient['latitude'], 'delivery_longitude' => $patient['longitude'],
+                'delivery_route_geometry' => json_encode($pricing['geometry'], JSON_THROW_ON_ERROR),
+                'delivery_route_duration_seconds' => $pricing['duration_seconds'], 'delivery_route_provider' => $pricing['provider'],
                 'total' => $subtotal + $taxAmount + $pricing['fee'], 'delivery_address_snapshot' => $patient['address'],
                 'delivery_preference' => $index % 4 === 0 ? 'scheduled' : 'asap',
                 'scheduled_delivery_at' => $index % 4 === 0 ? $createdAt->copy()->addDay() : null,
@@ -623,13 +628,24 @@ class DatabaseSeeder extends Seeder
 
     private function createDelivery(string $publicId, ?int $orderId, ?int $procurementId, string $status, ?array $driver, object $createdAt, object $now): int
     {
-        $activeStatuses = ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'];
+        $activeStatuses = ['claimed', 'pickup_started', 'in_transit', 'arrived'];
         $isActive = in_array($status, $activeStatuses, true);
         $isDelivered = $status === 'delivered';
+        $pickupInitiated = in_array($status, ['pickup_started', 'in_transit', 'arrived', 'failed', 'delivered'], true);
+        $pickupVerified = in_array($status, ['in_transit', 'arrived', 'failed', 'delivered'], true);
+        $recipientInitiated = in_array($status, ['arrived', 'delivered'], true);
         $deliveryId = DB::table('deliveries')->insertGetId([
             'public_id' => $publicId, 'order_id' => $orderId, 'procurement_order_id' => $procurementId,
             'driver_id' => $driver['id'] ?? null, 'status' => $status, 'scheduled_for' => $createdAt->copy()->addHours(2),
-            'pin_hash' => Hash::make(self::DEMO_PIN), 'pin_encrypted' => Crypt::encryptString(self::DEMO_PIN),
+            'pickup_code_hash' => $status === 'pickup_started' ? Hash::make(self::DEMO_VERIFICATION_CODE) : null,
+            'pickup_code_sent_at' => $pickupInitiated ? $createdAt->copy()->addMinutes(10) : null,
+            'pickup_code_expires_at' => $status === 'pickup_started' ? $now->copy()->addMinutes(config('medline.delivery_verification_ttl_minutes', 10)) : null,
+            'pickup_code_verified_at' => $pickupVerified ? $createdAt->copy()->addMinutes(16) : null,
+            'pickup_code_attempts' => 0,
+            'recipient_code_hash' => $status === 'arrived' ? Hash::make(self::DEMO_VERIFICATION_CODE) : null,
+            'recipient_code_sent_at' => $recipientInitiated ? ($isDelivered ? $createdAt->copy()->addMinutes(34) : $now->copy()->subMinute()) : null,
+            'recipient_code_expires_at' => $status === 'arrived' ? $now->copy()->addMinutes(config('medline.delivery_verification_ttl_minutes', 10)) : null,
+            'recipient_code_verified_at' => $isDelivered ? $createdAt->copy()->addMinutes(40) : null,
             'pin_used_at' => $isDelivered ? $createdAt->copy()->addMinutes(40) : null, 'pin_attempts' => 0,
             'claimed_at' => $driver ? $createdAt->copy()->addMinutes(5) : null,
             'completed_at' => $isDelivered ? $createdAt->copy()->addMinutes(40) : null,
@@ -644,20 +660,32 @@ class DatabaseSeeder extends Seeder
         $paths = [
             'available' => [], 'claimed' => ['claimed'],
             'pickup_started' => ['claimed', 'pickup_started'],
-            'picked_up' => ['claimed', 'pickup_started', 'picked_up'],
-            'in_transit' => ['claimed', 'pickup_started', 'picked_up', 'in_transit'],
-            'arrived' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'],
-            'failed' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'failed'],
+            'in_transit' => ['claimed', 'pickup_started', 'in_transit'],
+            'arrived' => ['claimed', 'pickup_started', 'in_transit', 'arrived'],
+            'failed' => ['claimed', 'pickup_started', 'in_transit', 'failed'],
             'cancelled' => ['cancelled'],
-            'delivered' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived', 'delivered'],
+            'delivered' => ['claimed', 'pickup_started', 'in_transit', 'arrived', 'delivered'],
         ];
+        $pickupUserId = $orderId
+            ? DB::table('orders')->join('partners', 'partners.id', '=', 'orders.pharmacy_id')->where('orders.id', $orderId)->value('partners.user_id')
+            : DB::table('procurement_orders')->join('partners', 'partners.id', '=', 'procurement_orders.warehouse_id')->where('procurement_orders.id', $procurementId)->value('partners.user_id');
+        $eventMinutes = ['cancelled' => 1, 'claimed' => 5, 'pickup_started' => 10, 'in_transit' => 16, 'arrived' => 34, 'failed' => 34, 'delivered' => 40];
         $from = 'available';
-        foreach ($paths[$status] as $eventIndex => $to) {
+        foreach ($paths[$status] as $to) {
+            $actorId = in_array($to, ['pickup_started', 'in_transit'], true) ? $pickupUserId : ($driver['user_id'] ?? null);
+            $note = match ($to) {
+                'pickup_started' => 'Pickup verification code sent to the assigned driver.',
+                'in_transit' => 'Pickup partner verified the handoff; delivery entered transit automatically.',
+                'arrived' => 'Driver arrived and initiated recipient handoff verification.',
+                'delivered' => 'Recipient handoff verified and delivery completed.',
+                'failed' => 'Delivery failed after the recipient could not be reached.',
+                default => 'Theater delivery transition to '.$to.'.',
+            };
             DB::table('delivery_events')->insert([
-                'delivery_id' => $deliveryId, 'actor_id' => $driver['user_id'] ?? null,
+                'delivery_id' => $deliveryId, 'actor_id' => $actorId,
                 'from_status' => $from, 'to_status' => $to,
-                'note' => $to === 'failed' ? 'Delivery failed after the recipient could not be reached.' : 'Theater delivery transition to '.$to.'.',
-                'created_at' => $createdAt->copy()->addMinutes(5 + $eventIndex * 6), 'updated_at' => $now,
+                'note' => $note,
+                'created_at' => $createdAt->copy()->addMinutes($eventMinutes[$to]), 'updated_at' => $now,
             ]);
             $from = $to;
         }
@@ -702,6 +730,8 @@ class DatabaseSeeder extends Seeder
                 'public_id' => $publicId, 'pharmacy_id' => $pharmacy['id'], 'warehouse_id' => $warehouse['id'],
                 'status' => $status, 'subtotal' => $subtotal, 'delivery_fee' => $deliveryFee,
                 'delivery_pricing_rate_id' => $rateId, 'delivery_distance_km' => $pricing['distance'], 'delivery_rate_per_km' => 100,
+                'delivery_route_geometry' => json_encode($pricing['geometry'], JSON_THROW_ON_ERROR),
+                'delivery_route_duration_seconds' => $pricing['duration_seconds'], 'delivery_route_provider' => $pricing['provider'],
                 'total' => $terminalWithoutDelivery ? 0 : $subtotal + $deliveryFee,
                 'delivery_address_snapshot' => $pharmacy['address'],
                 'delivery_preference' => $index % 2 === 0 ? 'scheduled' : 'asap',
@@ -862,7 +892,7 @@ class DatabaseSeeder extends Seeder
 
         $statusFamilies = [
             'orders' => ['accepted', 'cancelled', 'completed', 'partial_approval_required', 'partial_offer_rejected', 'partially_accepted', 'pending_pharmacy_review', 'prescription_required', 'prescription_review', 'rejected'],
-            'deliveries' => ['arrived', 'available', 'cancelled', 'claimed', 'delivered', 'failed', 'in_transit', 'picked_up', 'pickup_started'],
+            'deliveries' => ['arrived', 'available', 'cancelled', 'claimed', 'delivered', 'failed', 'in_transit', 'pickup_started'],
             'procurement_orders' => ['accepted', 'completed', 'partial_approval_required', 'partial_offer_rejected', 'partially_accepted', 'pending_warehouse_review', 'rejected'],
         ];
         foreach ($statusFamilies as $table => $expectedStatuses) {
@@ -874,12 +904,11 @@ class DatabaseSeeder extends Seeder
             'available' => [],
             'claimed' => ['claimed'],
             'pickup_started' => ['claimed', 'pickup_started'],
-            'picked_up' => ['claimed', 'pickup_started', 'picked_up'],
-            'in_transit' => ['claimed', 'pickup_started', 'picked_up', 'in_transit'],
-            'arrived' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'],
-            'failed' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'failed'],
+            'in_transit' => ['claimed', 'pickup_started', 'in_transit'],
+            'arrived' => ['claimed', 'pickup_started', 'in_transit', 'arrived'],
+            'failed' => ['claimed', 'pickup_started', 'in_transit', 'failed'],
             'cancelled' => ['cancelled'],
-            'delivered' => ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived', 'delivered'],
+            'delivered' => ['claimed', 'pickup_started', 'in_transit', 'arrived', 'delivered'],
         ];
         foreach (DB::table('deliveries')->get() as $delivery) {
             $hasExactlyOneParent = ($delivery->order_id !== null) !== ($delivery->procurement_order_id !== null);
@@ -891,6 +920,18 @@ class DatabaseSeeder extends Seeder
             }
             if ($delivery->status === 'delivered' && $delivery->procurement_order_id !== null) {
                 $expect(DB::table('procurement_orders')->where('id', $delivery->procurement_order_id)->where('status', 'completed')->exists(), "Delivered job {$delivery->public_id} must have a completed procurement.");
+            }
+            if ($delivery->status === 'pickup_started') {
+                $expect($delivery->pickup_code_hash !== null && $delivery->pickup_code_verified_at === null, "Pickup-started job {$delivery->public_id} must await the 4-digit driver code.");
+            }
+            if (in_array($delivery->status, ['in_transit', 'arrived', 'failed', 'delivered'], true)) {
+                $expect($delivery->pickup_code_verified_at !== null, "Progressed job {$delivery->public_id} must have verified pickup.");
+            }
+            if ($delivery->status === 'arrived') {
+                $expect($delivery->recipient_code_hash !== null && $delivery->recipient_code_verified_at === null, "Arrived job {$delivery->public_id} must await recipient verification.");
+            }
+            if ($delivery->status === 'delivered') {
+                $expect($delivery->recipient_code_verified_at !== null, "Delivered job {$delivery->public_id} must have a verified recipient handoff.");
             }
         }
         foreach (DB::table('orders')->where('status', 'completed')->get(['id', 'public_id']) as $order) {
@@ -952,13 +993,19 @@ class DatabaseSeeder extends Seeder
 
     private function deliveryPrice(float $fromLatitude, float $fromLongitude, float $toLatitude, float $toLongitude): array
     {
-        $latitudeDelta = deg2rad($toLatitude - $fromLatitude);
-        $longitudeDelta = deg2rad($toLongitude - $fromLongitude);
-        $haversine = sin($latitudeDelta / 2) ** 2
-            + cos(deg2rad($fromLatitude)) * cos(deg2rad($toLatitude)) * sin($longitudeDelta / 2) ** 2;
-        $bounded = min(1, max(0, $haversine));
-        $distance = round(6371 * 2 * atan2(sqrt($bounded), sqrt(1 - $bounded)), 2);
+        $key = implode('|', [$fromLatitude, $fromLongitude, $toLatitude, $toLongitude]);
+        if (! isset($this->roadRoutes[$key])) {
+            $route = app(MapProvider::class)->route($fromLatitude, $fromLongitude, $toLatitude, $toLongitude);
+            $distance = round((float) $route['distance_meters'] / 1000, 2);
+            $this->roadRoutes[$key] = [
+                'distance' => $distance,
+                'fee' => (float) round($distance * 100),
+                'geometry' => $route['geometry'],
+                'duration_seconds' => (int) $route['duration_seconds'],
+                'provider' => (string) $route['provider'],
+            ];
+        }
 
-        return ['distance' => $distance, 'fee' => (float) round($distance * 100)];
+        return $this->roadRoutes[$key];
     }
 }

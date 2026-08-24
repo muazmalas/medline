@@ -25,7 +25,7 @@ class AdminController extends Controller
                 'partners' => Partner::count(),
                 'pending_partners' => Partner::where('approval_status', 'pending')->count(),
                 'orders' => DB::table('orders')->count(),
-                'active_deliveries' => DB::table('deliveries')->whereIn('status', ['available', 'claimed', 'in_transit'])->count(),
+                'active_deliveries' => DB::table('deliveries')->whereIn('status', ['available', 'claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'])->count(),
                 'open_complaints' => DB::table('complaints')->whereIn('status', ['open', 'in_review'])->count(),
             ],
             'alerts' => [
@@ -184,6 +184,11 @@ class AdminController extends Controller
         $record->payment_proof_id = $proof?->id;
         $record->payment_proof_status = $proof?->status ?? 'not_submitted';
         $record->payment_proof_review_note = $proof?->review_note;
+        $record->working_hours = DB::table('partner_working_hours')
+            ->where('partner_id', $partner->id)
+            ->orderBy('day_of_week')
+            ->orderBy('opens_at')
+            ->get(['day_of_week', 'opens_at', 'closes_at']);
         return response()->json(['partner' => $record]);
     }
 
@@ -464,7 +469,7 @@ class AdminController extends Controller
         DatabaseTransaction::run(function () use ($delivery, $data, $request) {
             $row = DB::table('deliveries')->where('id', $delivery)->lockForUpdate()->firstOrFail();
             abort_unless($row->status === 'failed', 409, 'Only failed deliveries can be reassigned.');
-            DB::table('deliveries')->where('id', $delivery)->update(['driver_id' => null, 'status' => 'available', 'claimed_at' => null, 'failure_reason' => $data['reason'], 'pin_attempts' => 0, 'pin_locked_at' => null, 'last_latitude' => null, 'last_longitude' => null, 'location_accuracy_meters' => null, 'location_updated_at' => null, 'updated_at' => now()]);
+            DB::table('deliveries')->where('id', $delivery)->update(['driver_id' => null, 'status' => 'available', 'claimed_at' => null, 'failure_reason' => $data['reason'], 'pin_attempts' => 0, 'pin_locked_at' => null, 'pickup_code_hash' => null, 'pickup_code_sent_at' => null, 'pickup_code_expires_at' => null, 'pickup_code_verified_at' => null, 'pickup_code_attempts' => 0, 'pickup_code_locked_at' => null, 'recipient_code_hash' => null, 'recipient_code_sent_at' => null, 'recipient_code_expires_at' => null, 'recipient_code_verified_at' => null, 'recipient_code_attempts' => 0, 'recipient_code_locked_at' => null, 'last_latitude' => null, 'last_longitude' => null, 'location_accuracy_meters' => null, 'location_updated_at' => null, 'updated_at' => now()]);
             DB::table('delivery_events')->insert(['delivery_id' => $delivery, 'actor_id' => $request->user()->id, 'from_status' => 'failed', 'to_status' => 'reassigned', 'note' => $data['reason'], 'created_at' => now(), 'updated_at' => now()]);
         });
         AuditService::record($request, 'delivery.reassigned', 'delivery', $delivery, ['reason' => $data['reason']]);

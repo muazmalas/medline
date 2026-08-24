@@ -85,6 +85,31 @@ class CatalogAndWorkingHoursTest extends TestCase
         $this->actingAs($patient)->getJson('/api/v1/partner/working-hours')->assertForbidden();
     }
 
+    public function test_admin_partner_profile_includes_registered_working_hours(): void
+    {
+        $administrator = User::factory()->create(['role' => 'admin']);
+        $pharmacyUser = User::factory()->create(['role' => 'pharmacy']);
+        $partner = Partner::create([
+            'user_id' => $pharmacyUser->id,
+            'type' => 'pharmacy',
+            'business_name' => 'Profile Hours Pharmacy',
+            'approval_status' => 'approved',
+            'subscription_status' => 'active',
+        ]);
+        DB::table('partner_working_hours')->insert([
+            ['partner_id' => $partner->id, 'day_of_week' => 1, 'opens_at' => '08:00', 'closes_at' => '12:00', 'created_at' => now(), 'updated_at' => now()],
+            ['partner_id' => $partner->id, 'day_of_week' => 1, 'opens_at' => '16:00', 'closes_at' => '21:00', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->actingAs($administrator)
+            ->getJson('/api/v1/admin/partners/'.$partner->id)
+            ->assertOk()
+            ->assertJsonCount(2, 'partner.working_hours')
+            ->assertJsonPath('partner.working_hours.0.day_of_week', 1)
+            ->assertJsonPath('partner.working_hours.0.opens_at', '08:00:00')
+            ->assertJsonPath('partner.working_hours.1.opens_at', '16:00:00');
+    }
+
     public function test_notifications_support_search_status_sorting_and_pagination(): void
     {
         $user = User::factory()->create(['role' => 'patient']);

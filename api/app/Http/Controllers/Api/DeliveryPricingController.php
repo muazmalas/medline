@@ -9,6 +9,7 @@ use App\Support\DatabaseTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DeliveryPricingController extends Controller
 {
@@ -31,6 +32,44 @@ class DeliveryPricingController extends Controller
             'tax_rate_percent' => (float) config('medline.tax_rate', 0),
             'currency' => config('medline.currency', 'SYP'),
             'effective_at' => $current->effective_at,
+        ]);
+    }
+
+    public function estimate(Request $request, DeliveryPricingService $pricing): JsonResponse
+    {
+        abort_unless(in_array($request->user()->role, ['patient', 'pharmacy', 'admin'], true), 403);
+        $data = $request->validate([
+            'from_latitude' => ['required', 'numeric', 'between:-90,90'],
+            'from_longitude' => ['required', 'numeric', 'between:-180,180'],
+            'to_latitude' => ['required', 'numeric', 'between:-90,90'],
+            'to_longitude' => ['required', 'numeric', 'between:-180,180'],
+            'vehicle_type' => ['nullable', 'string', 'in:'.implode(',', $pricing->vehicleTypes())],
+        ]);
+        $vehicleType = $pricing->normalizeVehicleType($data['vehicle_type'] ?? null);
+
+        try {
+            $estimate = $pricing->estimate(
+                (float) $data['from_latitude'],
+                (float) $data['from_longitude'],
+                (float) $data['to_latitude'],
+                (float) $data['to_longitude'],
+                $pricing->current($vehicleType),
+            );
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() !== 'ROAD_ROUTE_UNAVAILABLE') {
+                throw $exception;
+            }
+
+            return response()->json([
+                'message' => 'The road route could not be calculated right now. Please retry before creating the order.',
+                'code' => 'ROAD_ROUTE_UNAVAILABLE',
+            ], 503);
+        }
+
+        return response()->json([
+            ...$estimate,
+            'vehicle_type' => $vehicleType,
+            'currency' => config('medline.currency', 'SYP'),
         ]);
     }
 

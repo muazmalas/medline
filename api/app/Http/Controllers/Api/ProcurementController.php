@@ -10,9 +10,7 @@ use Carbon\Carbon;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use App\Support\AuditService;
@@ -32,12 +30,7 @@ class ProcurementController extends Controller
             return $item;
         });
         $delivery = DB::table('deliveries')->where('procurement_order_id', $order->id)->latest('id')->first();
-        if ($delivery) {
-            if ($partner?->type === 'pharmacy' && $delivery->pin_encrypted) {
-                $delivery->delivery_pin = Crypt::decryptString($delivery->pin_encrypted);
-            }
-            unset($delivery->pin_hash, $delivery->pin_encrypted);
-        }
+        if ($delivery) unset($delivery->pin_hash, $delivery->pin_encrypted, $delivery->pickup_code_hash, $delivery->recipient_code_hash);
         $timeline = $delivery ? DB::table('delivery_events')->where('delivery_id', $delivery->id)->orderBy('created_at')->get() : collect();
         return response()->json(['procurement' => $order, 'items' => $items, 'delivery' => $delivery, 'timeline' => $timeline]);
     }
@@ -105,22 +98,30 @@ class ProcurementController extends Controller
             ? Carbon::parse($data['scheduled_delivery_at'])->utc()
             : null;
 
-        $procurement = DatabaseTransaction::run(function () use ($data, $request, $pricing, $deliveryPreference, $scheduledDeliveryAt, $batches) {
+        $roadRoute = null;
+        $hasRouteCoordinates = $warehouse->latitude !== null && $warehouse->longitude !== null && $pharmacy->latitude !== null && $pharmacy->longitude !== null;
+        if (! $hasRouteCoordinates && config('maps.routing_required', true)) {
+            return response()->json(['message' => 'Warehouse and pharmacy coordinates are required to calculate the road route and delivery fee.', 'code' => 'ROUTE_COORDINATES_REQUIRED'], 422);
+        }
+        if ($hasRouteCoordinates) {
+            try {
+                $roadRoute = $pricing->roadRoute((float) $warehouse->latitude, (float) $warehouse->longitude, (float) $pharmacy->latitude, (float) $pharmacy->longitude);
+            } catch (\RuntimeException $exception) {
+                if ($exception->getMessage() !== 'ROAD_ROUTE_UNAVAILABLE') throw $exception;
+                return response()->json(['message' => 'The road route could not be calculated right now. Please retry before creating the procurement order.', 'code' => 'ROAD_ROUTE_UNAVAILABLE'], 503);
+            }
+        }
+
+        $procurement = DatabaseTransaction::run(function () use ($data, $request, $pricing, $deliveryPreference, $scheduledDeliveryAt, $batches, $roadRoute) {
             $pharmacy = Partner::where('user_id', $request->user()->id)->where('type', 'pharmacy')->where('approval_status', 'approved')->where('subscription_status', 'active')->lockForUpdate()->first();
             if (! $pharmacy) abort(422, 'The pharmacy account is no longer available.');
             $warehouse = Partner::whereKey($data['warehouse_id'])->where('type', 'warehouse')->where('approval_status', 'approved')->where('subscription_status', 'active')->lockForUpdate()->first();
             if (! $warehouse) abort(422, 'The warehouse account is no longer available.');
             $vehicleType = $pricing->normalizeVehicleType($data['delivery_vehicle_type'] ?? null);
             $currentRate = $pricing->current($vehicleType, true);
-            $deliveryPricing = [
-                'pricing_rate_id' => $currentRate->id ? (int) $currentRate->id : null,
-                'distance_km' => null,
-                'rate_per_km' => (float) $currentRate->rate_per_km,
-                'fee' => 0.0,
-            ];
-            if ($warehouse->latitude !== null && $warehouse->longitude !== null && $pharmacy->latitude !== null && $pharmacy->longitude !== null) {
-                $deliveryPricing = $pricing->estimate((float) $warehouse->latitude, (float) $warehouse->longitude, (float) $pharmacy->latitude, (float) $pharmacy->longitude, $currentRate);
-            }
+            $deliveryPricing = $roadRoute
+                ? $pricing->priceRoute($roadRoute, $currentRate)
+                : ['pricing_rate_id' => $currentRate->id ? (int) $currentRate->id : null, 'distance_km' => null, 'rate_per_km' => (float) $currentRate->rate_per_km, 'fee' => 0.0, 'route_geometry' => null, 'route_duration_seconds' => null, 'route_provider' => null];
             $order = DB::table('procurement_orders')->insertGetId([
                 'public_id' => (string) Str::ulid(), 'pharmacy_id' => $pharmacy->id, 'warehouse_id' => $warehouse->id,
                 'status' => 'pending_warehouse_review', 'delivery_address_snapshot' => ($data['delivery_address_snapshot'] ?? null) ?: ($pharmacy->address ?? 'Pharmacy address not recorded'),
@@ -131,6 +132,9 @@ class ProcurementController extends Controller
                 'delivery_distance_km' => $deliveryPricing['distance_km'],
                 'delivery_rate_per_km' => $deliveryPricing['rate_per_km'],
                 'delivery_vehicle_type' => $vehicleType,
+                'delivery_route_geometry' => $deliveryPricing['route_geometry'] ? json_encode($deliveryPricing['route_geometry'], JSON_THROW_ON_ERROR) : null,
+                'delivery_route_duration_seconds' => $deliveryPricing['route_duration_seconds'],
+                'delivery_route_provider' => $deliveryPricing['route_provider'],
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $subtotal = 0;
@@ -224,14 +228,11 @@ class ProcurementController extends Controller
             ]);
             $deliveryId = null;
             if ($status === 'accepted') {
-                $pin = (string) random_int(100000, 999999);
                 $deliveryId = DB::table('deliveries')->insertGetId([
                     'public_id' => (string) Str::ulid(),
                     'procurement_order_id' => $order->id,
                     'status' => 'available',
                     'scheduled_for' => $order->scheduled_delivery_at,
-                    'pin_hash' => Hash::make($pin),
-                    'pin_encrypted' => Crypt::encryptString($pin),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -245,7 +246,6 @@ class ProcurementController extends Controller
         NotificationService::send($pharmacyUser, 'procurement.decision', ['procurement_id' => $result->public_id, 'status' => $result->status, 'note' => $data['note'] ?? null, 'message' => 'The warehouse updated your procurement order.']);
         if ($deliveryId) {
             NotificationService::send($pharmacyUser, 'procurement.delivery_created', ['delivery_id' => $deliveryId, 'message' => 'Your warehouse procurement is ready for delivery.']);
-            NotificationService::send($pharmacyUser, 'delivery.pin_available', ['delivery_id' => $deliveryId, 'message' => 'Your delivery PIN is available in the secure order screen.']);
             DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.available', ['delivery_id' => $deliveryId, 'message' => 'A new delivery job is available.']));
         }
         AuditService::record($request, 'procurement.' . $result->status, 'procurement_order', $result->id, ['decision' => $data['decision'], 'note' => $data['note'] ?? null, 'items' => $data['items'] ?? []]);
@@ -270,14 +270,11 @@ class ProcurementController extends Controller
                 DB::table('procurement_orders')->where('id', $order->id)->update(['status' => 'partial_offer_rejected', 'subtotal' => 0, 'total' => 0, 'updated_at' => now()]);
             } else {
                 DB::table('procurement_orders')->where('id', $order->id)->update(['status' => 'partially_accepted', 'updated_at' => now()]);
-                $pin = (string) random_int(100000, 999999);
                 $deliveryId = DB::table('deliveries')->insertGetId([
                     'public_id' => (string) Str::ulid(),
                     'procurement_order_id' => $order->id,
                     'status' => 'available',
                     'scheduled_for' => $order->scheduled_delivery_at,
-                    'pin_hash' => Hash::make($pin),
-                    'pin_encrypted' => Crypt::encryptString($pin),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -291,7 +288,6 @@ class ProcurementController extends Controller
         NotificationService::send($warehouseUser, 'procurement.partial_offer_decision', ['procurement_id' => $result->public_id, 'status' => $result->status, 'message' => $data['decision'] === 'approve' ? 'The pharmacy approved the partial procurement offer.' : 'The pharmacy declined the partial procurement offer.']);
         if ($transactionResult['delivery_id']) {
             NotificationService::send($request->user(), 'procurement.delivery_created', ['delivery_id' => $transactionResult['delivery_id'], 'message' => 'Your approved partial procurement is ready for delivery.']);
-            NotificationService::send($request->user(), 'delivery.pin_available', ['delivery_id' => $transactionResult['delivery_id'], 'message' => 'Your delivery PIN is available in the secure procurement screen.']);
             DB::table('drivers')->where('approval_status', 'approved')->where('is_available', true)->pluck('user_id')->each(fn ($driverUserId) => NotificationService::send($driverUserId, 'delivery.available', ['delivery_id' => $transactionResult['delivery_id'], 'message' => 'A new delivery job is available.']));
         }
         AuditService::record($request, 'procurement.partial_offer_' . $data['decision'], 'procurement_order', $result->id, ['decision' => $data['decision']]);

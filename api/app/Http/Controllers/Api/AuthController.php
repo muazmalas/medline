@@ -11,12 +11,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Crypt;
 use App\Support\AuditService;
 use App\Support\NotificationService;
 use App\Support\DatabaseTransaction;
+use App\Support\MedlineMail;
 use App\Contracts\FileScanner;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -199,9 +199,7 @@ class AuthController extends Controller
                 ['token' => hash('sha256', $plainToken), 'created_at' => now()],
             );
             try {
-                Mail::raw('Use this MedLine password reset token within 60 minutes: ' . $plainToken, function ($message) use ($user) {
-                    $message->to($user->email)->subject('MedLine password reset');
-                });
+                MedlineMail::passwordReset($user, $plainToken);
             } catch (Throwable $exception) {
                 report($exception);
             }
@@ -256,11 +254,8 @@ class AuthController extends Controller
         if ($user->email_verified_at) return;
         $plainToken = Str::random(64);
         DB::table('email_verification_tokens')->updateOrInsert(['email' => $user->email], ['token' => hash('sha256', $plainToken), 'created_at' => now()]);
-        $url = rtrim((string) config('app.url'), '/') . '/api/v1/auth/verify-email?email=' . urlencode($user->email) . '&token=' . urlencode($plainToken);
         try {
-            Mail::raw('Verify your MedLine email address within 24 hours: ' . $url, function ($message) use ($user) {
-                $message->to($user->email)->subject('Verify your MedLine email address');
-            });
+            MedlineMail::emailVerification($user, $plainToken);
         } catch (Throwable $exception) {
             report($exception);
         }

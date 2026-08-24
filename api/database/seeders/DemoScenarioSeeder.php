@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -145,14 +144,15 @@ class DemoScenarioSeeder extends Seeder
     private function delivery(int $orderId, ?int $driverId, string $status, ?string $lat, ?string $lng): int
     {
         $publicId = 'DEMO-DEL-' . str_pad((string) $orderId, 10, '0', STR_PAD_LEFT);
-        DB::table('deliveries')->updateOrInsert(['order_id' => $orderId], ['public_id' => $publicId, 'driver_id' => $driverId, 'status' => $status, 'pin_hash' => Hash::make('2468'), 'pin_encrypted' => Crypt::encryptString('2468'), 'claimed_at' => $driverId ? now()->subMinutes(12) : null, 'completed_at' => $status === 'delivered' ? now()->subMinutes(4) : null, 'last_latitude' => $lat, 'last_longitude' => $lng, 'location_accuracy_meters' => $lat ? 8.5 : null, 'location_updated_at' => $lat ? now()->subMinutes(1) : null, 'updated_at' => now(), 'created_at' => now()]);
+        $pickupVerified = in_array($status, ['in_transit', 'arrived', 'delivered'], true);
+        DB::table('deliveries')->updateOrInsert(['order_id' => $orderId], ['public_id' => $publicId, 'driver_id' => $driverId, 'status' => $status, 'pin_hash' => null, 'pin_encrypted' => null, 'pickup_code_sent_at' => $pickupVerified ? now()->subMinutes(10) : null, 'pickup_code_verified_at' => $pickupVerified ? now()->subMinutes(9) : null, 'recipient_code_sent_at' => $status === 'delivered' ? now()->subMinutes(5) : null, 'recipient_code_verified_at' => $status === 'delivered' ? now()->subMinutes(4) : null, 'claimed_at' => $driverId ? now()->subMinutes(12) : null, 'completed_at' => $status === 'delivered' ? now()->subMinutes(4) : null, 'last_latitude' => $lat, 'last_longitude' => $lng, 'location_accuracy_meters' => $lat ? 8.5 : null, 'location_updated_at' => $lat ? now()->subMinutes(1) : null, 'updated_at' => now(), 'created_at' => now()]);
         return (int) DB::table('deliveries')->where('order_id', $orderId)->value('id');
     }
 
     private function deliveryEvents(int $orderId, int $actorId): void
     {
         $deliveryId = (int) DB::table('deliveries')->where('order_id', $orderId)->value('id');
-        foreach ([['available', 'claimed'], ['claimed', 'pickup_started'], ['pickup_started', 'picked_up'], ['picked_up', 'in_transit']] as $index => [$from, $to]) {
+        foreach ([['available', 'claimed'], ['claimed', 'pickup_started'], ['pickup_started', 'in_transit']] as $index => [$from, $to]) {
             DB::table('delivery_events')->updateOrInsert(['delivery_id' => $deliveryId, 'from_status' => $from, 'to_status' => $to], ['actor_id' => $actorId, 'note' => 'Demo tracking event ' . ($index + 1), 'updated_at' => now(), 'created_at' => now()->subMinutes(15 - $index * 3)]);
         }
     }

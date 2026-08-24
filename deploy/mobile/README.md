@@ -12,6 +12,15 @@ flutter build apk --release --dart-define=MEDLINE_API_URL=https://api.example.co
 flutter build web --release --dart-define=MEDLINE_API_URL=https://api.example.com/api/v1
 ```
 
+Local unsigned debug variants can be assembled together with:
+
+```powershell
+cd mobile\android
+.\gradlew.bat assembleDebug
+```
+
+The resulting development, staging, and production APKs are written to `mobile/build/app/outputs/flutter-apk/`. They are verification artifacts only; distribute a properly configured and signed release build.
+
 ## Android signing handoff
 
 1. Create a dedicated MedLine upload key in the organization’s password manager.

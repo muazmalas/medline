@@ -183,7 +183,7 @@ class WarehouseAccessAndProcurementReviewTest extends TestCase
             ->assertOk()
             ->assertJsonMissingPath('delivery.pin_hash')
             ->assertJsonMissingPath('delivery.pin_encrypted');
-        $this->assertMatchesRegularExpression('/^\d{6}$/', (string) $pharmacyView->json('delivery.delivery_pin'));
+        $pharmacyView->assertJsonMissingPath('delivery.delivery_pin');
 
         $this->actingAs($warehouseUser)
             ->getJson('/api/v1/procurement/'.$procurement['id'])

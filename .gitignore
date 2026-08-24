@@ -4,6 +4,7 @@ web/node_modules/
 web/dist/
 web/coverage/
 api/vendor/
+api/.env
 api/storage/app/private/
 api/storage/app/public/
 api/storage/framework/

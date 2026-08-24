@@ -115,4 +115,22 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Recipient Redirect
+    |--------------------------------------------------------------------------
+    |
+    | Demo environments can force every outgoing message into one inbox. The
+    | mailer replaces all To recipients and removes CC/BCC before delivery.
+    |
+    */
+
+    'to' => filter_var(env('MAIL_DEMO_MODE', false), FILTER_VALIDATE_BOOL)
+        && filled(env('MAIL_DEMO_TO_ADDRESS'))
+            ? [
+                'address' => env('MAIL_DEMO_TO_ADDRESS'),
+                'name' => env('MAIL_DEMO_TO_NAME', 'MedLine Demo Inbox'),
+            ]
+            : null,
+
 ];

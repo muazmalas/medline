@@ -8,7 +8,7 @@ Use [`RELEASE_CONFIGURATION_MATRIX.md`](./RELEASE_CONFIGURATION_MATRIX.md) as th
 
 - [x] Laravel API versioning, health/readiness responses, exception format, request IDs, queues, scheduler, throttles, private storage, and audit boundaries are implemented.
 - [x] React role-aware portals, operational queues, catalog, procurement, prescriptions, delivery monitoring, support, notifications, settings, and an opt-in privacy-safe crash/API telemetry boundary are implemented.
-- [x] Flutter role routing, patient ordering, partner workflows, driver delivery lifecycle, secure storage, push registration, telemetry boundary, and Android flavors are implemented.
+- [x] Flutter role routing, patient ordering, pharmacy/warehouse workflows, driver delivery lifecycle, mobile administration, secure storage, push registration, telemetry boundary, and Android flavors are implemented.
 - [x] MySQL migrations, seed structure, idempotency, reservations, inventory movements, PIN protection, and notification persistence are implemented.
 - [x] API contract, workflow guide, ERD, traceability matrix, privacy baseline, security operations, local development, and Windows deployment documentation are present.
 - [x] Operations recovery runbook covers stuck orders/deliveries, failed notifications, payment-proof backlog, private-file recovery, severity, and rollback boundaries.
@@ -23,6 +23,7 @@ Use [`RELEASE_CONFIGURATION_MATRIX.md`](./RELEASE_CONFIGURATION_MATRIX.md) as th
 - [x] Account, medical-document, payment-proof, complaint-attachment, audit, telemetry, backup, legal-hold, and deletion boundaries are documented in [`RETENTION_AND_DELETION_POLICY.md`](./RETENTION_AND_DELETION_POLICY.md).
 - [x] Browser refresh credentials use an encrypted HttpOnly cookie with configurable trusted-origin credentialed CORS; native Flutter sessions retain secure body-token transport.
 - [x] Client acceptance gates are explicitly documented for Arabic RTL/English LTR navigation and detail views, keyboard and screen-reader semantics, private evidence visibility, and driver location permission/freshness behavior.
+- [x] Automated source acceptance completed on 20 August 2026: Laravel 53 tests/381 assertions, React 49 UI tests plus production build, Flutter analysis/widget tests, Laravel route registration, and development/staging/production Android debug APK assembly.
 
 ## Owner-supplied release values
 

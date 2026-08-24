@@ -10,7 +10,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use App\Support\NotificationService;
 use App\Support\AuditService;
@@ -80,12 +79,11 @@ class OrderController extends Controller
             $item->accepted_line_total = (float) $item->unit_price * (int) $item->accepted_quantity;
         });
         $order->setRelation('items', $items);
-        $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'scheduled_for', 'driver_id', 'completed_at', 'failure_reason', 'pin_used_at', 'pin_encrypted', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
+        $delivery = DB::table('deliveries')->where('order_id', $order->id)->select('id', 'public_id', 'status', 'scheduled_for', 'driver_id', 'completed_at', 'failure_reason', 'pickup_code_sent_at', 'pickup_code_expires_at', 'pickup_code_verified_at', 'recipient_code_sent_at', 'recipient_code_expires_at', 'recipient_code_verified_at', 'last_latitude', 'last_longitude', 'location_accuracy_meters', 'location_updated_at', 'created_at', 'updated_at')->first();
         if ($delivery) {
             $delivery->driver = $delivery->driver_id
                 ? DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->where('drivers.id', $delivery->driver_id)->select('drivers.id as driver_id', 'users.name', 'users.email', 'drivers.vehicle_type', 'drivers.vehicle_plate', 'drivers.approval_status', 'drivers.is_available')->first()
                 : null;
-            if ($request->user()->role === 'patient' && $delivery->status !== 'delivered' && ! $delivery->pin_used_at && $delivery->pin_encrypted) $delivery->delivery_pin = Crypt::decryptString($delivery->pin_encrypted);
             $locationFreshAfter = now()->subMinutes(config('medline.delivery_location_stale_minutes', 10));
             if (! in_array($delivery->status, ['claimed', 'pickup_started', 'picked_up', 'in_transit', 'arrived'], true) || ! $delivery->location_updated_at || strtotime((string) $delivery->location_updated_at) < $locationFreshAfter->timestamp) {
                 $delivery->last_latitude = null;
@@ -93,22 +91,23 @@ class OrderController extends Controller
                 $delivery->location_accuracy_meters = null;
                 $delivery->location_updated_at = null;
             }
-            unset($delivery->pin_encrypted);
         }
         $events = $delivery
             ? DB::table('delivery_events')->where('delivery_id', $delivery->id)->select('from_status', 'to_status', 'note', 'created_at')->orderBy('created_at')->get()
             : collect();
         $rating = DB::table('ratings')->where('order_id', $order->id)->where('created_by', $request->user()->id)->select('score', 'comment', 'created_at')->first();
         $pickup = DB::table('partners')->where('id', $order->pharmacy_id)->select('business_name as label', 'address', 'latitude', 'longitude')->first();
-        $dropoff = $order->address_id
-            ? DB::table('addresses')->where('id', $order->address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
-            : ($order->delivery_latitude !== null && $order->delivery_longitude !== null ? (object) [
+        $dropoff = $order->delivery_latitude !== null && $order->delivery_longitude !== null
+            ? (object) [
                 'label' => $order->delivery_address_snapshot,
                 'city' => null,
                 'district' => null,
                 'latitude' => (float) $order->delivery_latitude,
                 'longitude' => (float) $order->delivery_longitude,
-            ] : null);
+            ]
+            : ($order->address_id
+                ? DB::table('addresses')->where('id', $order->address_id)->select('address_line as label', 'city', 'district', 'latitude', 'longitude')->first()
+                : null);
 
         return response()->json([
             'order' => $order,
@@ -116,6 +115,10 @@ class OrderController extends Controller
             'route' => [
                 'pickup' => $pickup,
                 'dropoff' => $dropoff,
+                'geometry' => $order->delivery_route_geometry,
+                'distance_km' => $order->delivery_distance_km,
+                'duration_seconds' => $order->delivery_route_duration_seconds,
+                'provider' => $order->delivery_route_provider,
             ],
             'timeline' => $events,
             'rating' => $rating,
@@ -192,8 +195,22 @@ class OrderController extends Controller
             return response()->json(['message' => 'The selected pharmacy is not currently available.', 'code' => 'PHARMACY_UNAVAILABLE'], 422);
         }
 
+        $roadRoute = null;
+        $hasRouteCoordinates = $pharmacy->latitude !== null && $pharmacy->longitude !== null && $deliveryLatitude !== null && $deliveryLongitude !== null;
+        if (! $hasRouteCoordinates && config('maps.routing_required', true)) {
+            return response()->json(['message' => 'Pickup and delivery coordinates are required to calculate the road route and delivery fee.', 'code' => 'ROUTE_COORDINATES_REQUIRED'], 422);
+        }
+        if ($hasRouteCoordinates) {
+            try {
+                $roadRoute = $pricing->roadRoute((float) $pharmacy->latitude, (float) $pharmacy->longitude, $deliveryLatitude, $deliveryLongitude);
+            } catch (\RuntimeException $exception) {
+                if ($exception->getMessage() !== 'ROAD_ROUTE_UNAVAILABLE') throw $exception;
+                return response()->json(['message' => 'The road route could not be calculated right now. Please retry before creating the order.', 'code' => 'ROAD_ROUTE_UNAVAILABLE'], 503);
+            }
+        }
+
         try {
-            $order = DatabaseTransaction::run(function () use ($data, $request, $deliveryLatitude, $deliveryLongitude, $deliveryPreference, $scheduledDeliveryAt, $pricing) {
+            $order = DatabaseTransaction::run(function () use ($data, $request, $deliveryLatitude, $deliveryLongitude, $deliveryPreference, $scheduledDeliveryAt, $pricing, $roadRoute) {
                 $pharmacy = Partner::where('id', $data['pharmacy_id'])
                     ->where('type', 'pharmacy')
                     ->where('approval_status', 'approved')
@@ -203,15 +220,9 @@ class OrderController extends Controller
                 if (! $pharmacy) throw new \RuntimeException('PHARMACY_UNAVAILABLE');
                 $vehicleType = $pricing->normalizeVehicleType($data['delivery_vehicle_type'] ?? null);
                 $currentRate = $pricing->current($vehicleType, true);
-                $deliveryPricing = [
-                    'pricing_rate_id' => $currentRate->id ? (int) $currentRate->id : null,
-                    'distance_km' => null,
-                    'rate_per_km' => (float) $currentRate->rate_per_km,
-                    'fee' => 0.0,
-                ];
-                if ($pharmacy->latitude !== null && $pharmacy->longitude !== null && $deliveryLatitude !== null && $deliveryLongitude !== null) {
-                    $deliveryPricing = $pricing->estimate((float) $pharmacy->latitude, (float) $pharmacy->longitude, $deliveryLatitude, $deliveryLongitude, $currentRate);
-                }
+                $deliveryPricing = $roadRoute
+                    ? $pricing->priceRoute($roadRoute, $currentRate)
+                    : ['pricing_rate_id' => $currentRate->id ? (int) $currentRate->id : null, 'distance_km' => null, 'rate_per_km' => (float) $currentRate->rate_per_km, 'fee' => 0.0, 'route_geometry' => null, 'route_duration_seconds' => null, 'route_provider' => null];
                 $requiresPrescription = false;
                 $taxRate = max(0, (float) config('medline.tax_rate', 0));
                 $order = Order::create([
@@ -230,6 +241,9 @@ class OrderController extends Controller
                     'delivery_vehicle_type' => $vehicleType,
                     'delivery_latitude' => $deliveryLatitude,
                     'delivery_longitude' => $deliveryLongitude,
+                    'delivery_route_geometry' => $deliveryPricing['route_geometry'],
+                    'delivery_route_duration_seconds' => $deliveryPricing['route_duration_seconds'],
+                    'delivery_route_provider' => $deliveryPricing['route_provider'],
                     'delivery_address_snapshot' => $data['delivery_address_snapshot'],
                     'delivery_preference' => $deliveryPreference,
                     'scheduled_delivery_at' => $scheduledDeliveryAt,
