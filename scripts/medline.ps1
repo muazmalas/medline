@@ -566,14 +566,30 @@ function Start-MedLineRuntime {
     $apiEnvironment = "`$env:APP_URL = 'http://127.0.0.1:$($options.ApiPort)'; `$env:REVERB_HOST = '127.0.0.1'; `$env:REVERB_PORT = '$($options.ReverbPort)'; `$env:REVERB_SCHEME = 'http'; `$env:REVERB_SERVER_HOST = '127.0.0.1'; `$env:REVERB_SERVER_PORT = '$($options.ReverbPort)'; `$env:MEDLINE_WEB_URL = 'http://127.0.0.1:$($options.WebPort)';"
 
     $apiListener = Get-PortListener $options.ApiPort
+    $startApi = $true
     if ($apiListener) {
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$($options.ApiPort)/api/v1/health" -TimeoutSec 2
-            Write-Info "Laravel API is already running on port $($options.ApiPort)."
+            if ($apiListener.LocalAddress -in @('0.0.0.0', '::')) {
+                Write-Info "Laravel API is already listening on all interfaces at port $($options.ApiPort)."
+                $startApi = $false
+            } else {
+                Write-Warning "Restarting the MedLine API because it is only listening on $($apiListener.LocalAddress):$($options.ApiPort)."
+                Stop-Process -Id $apiListener.OwningProcess -Force
+                for ($attempt = 0; $attempt -lt 20 -and (Get-PortListener $options.ApiPort); $attempt++) {
+                    Start-Sleep -Milliseconds 100
+                }
+                if (Get-PortListener $options.ApiPort) {
+                    throw "The old API process did not release port $($options.ApiPort)."
+                }
+            }
         } catch {
-            throw "API port $($options.ApiPort) is occupied by $(Get-ListenerDescription $apiListener), but it is not the MedLine API."
+            if (Get-PortListener $options.ApiPort) {
+                throw "API port $($options.ApiPort) is occupied by $(Get-ListenerDescription $apiListener), but it is not a reachable MedLine API."
+            }
         }
-    } else {
+    }
+    if ($startApi) {
         Start-MedLineTerminal 'API' $apiRoot "$apiEnvironment & $php artisan serve --host=0.0.0.0 --port=$($options.ApiPort)"
     }
 
